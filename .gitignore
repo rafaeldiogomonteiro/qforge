@@ -3,10 +3,25 @@ node_modules/
 npm-debug.log
 yarn-error.log
 
+# Build / cobertura / cache
+dist/
+build/
+coverage/
+.nyc_output/
+.eslintcache
+.cache/
+
+# Temporários
+tmp/
+temp/
+*.pid
+*.pid.lock
+
 # Ambiente
 .env
 .env.local
 .env.*.local
+.envrc
 
 # Logs
 logs/
@@ -15,5 +30,11 @@ logs/
 # Sistema / IDE
 .DS_Store
 Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
 .vscode/
 .idea/
+.history/
+
+# Docs locais
+QForge-relatorio.md

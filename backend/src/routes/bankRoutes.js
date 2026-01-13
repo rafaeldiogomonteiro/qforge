@@ -1,12 +1,28 @@
 import express from "express";
-import { listBanks, createBank } from "../controllers/BankController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import {
+  createBank,
+  listMyBanks,
+  getBankById,
+  updateBank,
+  deleteBank,
+  updateBankStatus,
+  exportBank,
+} from "../controllers/QuestionBankController.js";
 
 const router = express.Router();
 
+// todas as rotas de bancos exigem utilizador autenticado
 router.use(authMiddleware);
 
-router.get("/", listBanks);
+router.get("/", listMyBanks);
 router.post("/", createBank);
+router.get("/:id", getBankById);
+router.put("/:id", updateBank);
+router.patch("/:id/status", updateBankStatus); // <-- NOVA ROTA
+router.delete("/:id", deleteBank);
+
+// Exportação: /banks/:id/export?format=gift|aiken|moodle
+router.get("/:id/export", exportBank);
 
 export default router;

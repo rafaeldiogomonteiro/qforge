@@ -1,5 +1,79 @@
 import Question from "../models/Question.js";
 import QuestionBank from "../models/QuestionBank.js";
+import mongoose from "mongoose";
+import Label from "../models/Label.js";
+import ChapterTag from "../models/ChapterTag.js";
+
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((v) => (typeof v === "string" ? v.trim() : null))
+    .filter(Boolean);
+}
+
+function looksLikeObjectId(value) {
+  return typeof value === "string" && mongoose.Types.ObjectId.isValid(value);
+}
+
+async function upsertLabelsFromNames(names) {
+  const cleaned = [...new Set(normalizeStringArray(names))];
+  const ids = [];
+
+  for (const name of cleaned) {
+    const normalizedName = name.toLowerCase();
+    const label = await Label.findOneAndUpdate(
+      { normalizedName },
+      { $setOnInsert: { name, normalizedName, isActive: true } },
+      { new: true, upsert: true }
+    );
+    if (label.isActive === false) {
+      label.isActive = true;
+      await label.save();
+    }
+    ids.push(label._id);
+  }
+
+  return ids;
+}
+
+async function upsertChapterTagsFromNames(names) {
+  const cleaned = [...new Set(normalizeStringArray(names))];
+  const ids = [];
+
+  for (const name of cleaned) {
+    const normalizedName = name.toLowerCase();
+    const tag = await ChapterTag.findOneAndUpdate(
+      { normalizedName },
+      { $setOnInsert: { name, normalizedName, isActive: true } },
+      { new: true, upsert: true }
+    );
+    if (tag.isActive === false) {
+      tag.isActive = true;
+      await tag.save();
+    }
+    ids.push(tag._id);
+  }
+
+  return ids;
+}
+
+async function namesFromChapterTagIds(ids) {
+  const uniqueIds = [...new Set((ids || []).filter(Boolean).map(String))];
+  if (uniqueIds.length === 0) return [];
+  const tags = await ChapterTag.find({ _id: { $in: uniqueIds } })
+    .select("name")
+    .lean();
+  return tags.map((t) => t.name);
+}
+
+function validateDifficulty(value) {
+  if (value === undefined) return null;
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 1 || num > 4) {
+    return { error: "difficulty inválida. Use 1 (Básico) a 4 (Muito Difícil)" };
+  }
+  return { value: num };
+}
 
 // POST /banks/:bankId/questions
 export async function createQuestion(req, res) {
@@ -12,6 +86,8 @@ export async function createQuestion(req, res) {
       acceptableAnswers,
       difficulty,
       tags,
+      chapterTags,
+      labels,
       source,
       status,
     } = req.body;
@@ -31,20 +107,56 @@ export async function createQuestion(req, res) {
       return res.status(400).json({ error: "stem (enunciado) é obrigatório" });
     }
 
+    const difficultyCheck = validateDifficulty(difficulty);
+    if (difficultyCheck?.error) {
+      return res.status(400).json({ error: difficultyCheck.error });
+    }
+
+    let chapterTagIds = [];
+    if (chapterTags !== undefined) {
+      if (Array.isArray(chapterTags) && chapterTags.every(looksLikeObjectId)) {
+        chapterTagIds = chapterTags;
+      } else {
+        chapterTagIds = await upsertChapterTagsFromNames(chapterTags);
+      }
+    } else if (tags !== undefined) {
+      // Compatibilidade: tags (strings) -> chapterTags
+      chapterTagIds = await upsertChapterTagsFromNames(tags);
+    }
+
+    let labelIds = [];
+    if (labels !== undefined) {
+      if (Array.isArray(labels) && labels.every(looksLikeObjectId)) {
+        labelIds = labels;
+      } else {
+        labelIds = await upsertLabelsFromNames(labels);
+      }
+    }
+
+    const legacyTagNames = await namesFromChapterTagIds(chapterTagIds);
+
     const question = await Question.create({
       bank: bank._id,
       type: type || "MULTIPLE_CHOICE",
       stem,
       options: options || [],
       acceptableAnswers: acceptableAnswers || [],
-      difficulty: difficulty || 2,
-      tags: tags || [],
+      difficulty: difficultyCheck?.value ?? 2,
+      // tags legacy mantém nomes das chapterTags (para não partir clientes)
+      tags: legacyTagNames,
+      chapterTags: chapterTagIds,
+      labels: labelIds,
       source: source || "MANUAL",
       status: status || "DRAFT",
       createdBy: req.userId,
     });
 
-    res.status(201).json(question);
+    const populated = await Question.findById(question._id)
+      .populate("labels", "name isActive")
+      .populate("chapterTags", "name isActive")
+      .lean();
+
+    res.status(201).json(populated || question);
   } catch (err) {
     console.error("Erro em createQuestion:", err);
     res.status(500).json({ error: "Erro no servidor" });
@@ -67,9 +179,11 @@ export async function listQuestionsForBank(req, res) {
         .json({ error: "Não tens permissão para ver as questões deste banco" });
     }
 
-    const questions = await Question.find({ bank: bankId }).sort({
-      createdAt: -1,
-    });
+    const questions = await Question.find({ bank: bankId })
+      .sort({ createdAt: -1 })
+      .populate("labels", "name isActive")
+      .populate("chapterTags", "name isActive")
+      .lean();
 
     res.json(questions);
   } catch (err) {
@@ -83,7 +197,10 @@ export async function getQuestionById(req, res) {
   try {
     const { id } = req.params;
 
-    const question = await Question.findById(id).populate("bank");
+    const question = await Question.findById(id)
+      .populate("bank")
+      .populate("labels", "name isActive")
+      .populate("chapterTags", "name isActive");
     if (!question) {
       return res.status(404).json({ error: "Questão não encontrada" });
     }
@@ -113,6 +230,8 @@ export async function updateQuestion(req, res) {
       acceptableAnswers,
       difficulty,
       tags,
+      chapterTags,
+      labels,
       source,
       status,
     } = req.body;
@@ -134,14 +253,46 @@ export async function updateQuestion(req, res) {
     if (options !== undefined) question.options = options;
     if (acceptableAnswers !== undefined)
       question.acceptableAnswers = acceptableAnswers;
-    if (difficulty !== undefined) question.difficulty = difficulty;
-    if (tags !== undefined) question.tags = tags;
+    if (difficulty !== undefined) {
+      const difficultyCheck = validateDifficulty(difficulty);
+      if (difficultyCheck?.error) {
+        return res.status(400).json({ error: difficultyCheck.error });
+      }
+      question.difficulty = difficultyCheck.value;
+    }
+
+    if (labels !== undefined) {
+      if (Array.isArray(labels) && labels.every(looksLikeObjectId)) {
+        question.labels = labels;
+      } else {
+        question.labels = await upsertLabelsFromNames(labels);
+      }
+    }
+
+    // chapterTags aceita ids ou nomes; tags (legacy) aceita nomes
+    if (chapterTags !== undefined) {
+      if (Array.isArray(chapterTags) && chapterTags.every(looksLikeObjectId)) {
+        question.chapterTags = chapterTags;
+      } else {
+        question.chapterTags = await upsertChapterTagsFromNames(chapterTags);
+      }
+      question.tags = await namesFromChapterTagIds(question.chapterTags);
+    } else if (tags !== undefined) {
+      question.chapterTags = await upsertChapterTagsFromNames(tags);
+      question.tags = await namesFromChapterTagIds(question.chapterTags);
+    }
     if (source !== undefined) question.source = source;
     if (status !== undefined) question.status = status;
 
     await question.save();
 
-    res.json(question);
+    const populated = await Question.findById(question._id)
+      .populate("bank")
+      .populate("labels", "name isActive")
+      .populate("chapterTags", "name isActive")
+      .lean();
+
+    res.json(populated || question);
   } catch (err) {
     console.error("Erro em updateQuestion:", err);
     res.status(500).json({ error: "Erro no servidor" });

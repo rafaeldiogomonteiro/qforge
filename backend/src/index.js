@@ -14,6 +14,11 @@ import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./config/swagger.js";
 import authRoutes from "./routes/authRoutes.js";
 import bankRoutes from "./routes/bankRoutes.js";
+import questionRoutes from "./routes/questionRoutes.js";
+import labelRoutes from "./routes/labelRoutes.js";
+import chapterTagRoutes from "./routes/chapterTagRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js";
+import User from "./models/User.js";
 
 const app = express();
 
@@ -26,6 +31,10 @@ app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // Rotas principais
 app.use("/auth", authRoutes);
 app.use("/banks", bankRoutes);
+app.use("/", questionRoutes);
+app.use("/labels", labelRoutes);
+app.use("/chapter-tags", chapterTagRoutes);
+app.use("/ai", aiRoutes);
 
 // Rotas de teste/desenvolvimento
 app.use("/dev", devRoutes);
@@ -40,6 +49,10 @@ const PORT = process.env.PORT || 4000;
 async function start() {
   try {
     await connectDB();
+
+    // Migração simples: role "COORDENADOR" foi removido -> passa a "DOCENTE"
+    await User.updateMany({ role: "COORDENADOR" }, { $set: { role: "DOCENTE" } });
+
     app.listen(PORT, () => {
       console.log(`🚀 Server a correr em http://localhost:${PORT}`);
     });

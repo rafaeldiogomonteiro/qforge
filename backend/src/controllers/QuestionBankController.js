@@ -3,7 +3,8 @@ import User from "../models/User.js";
 import Question from "../models/Question.js";
 
 function canSetOfficialOrArchived(role) {
-  return role === "COORDENADOR" || role === "ADMIN";
+  // "COORDENADOR" foi removido; "DOCENTE" herda essas permissões
+  return role === "DOCENTE" || role === "ADMIN";
 }
 
 function isValidStatusTransition(from, to) {
@@ -253,15 +254,15 @@ export async function updateBankStatus(req, res) {
       });
     }
 
-    // OFFICIAL / ARCHIVED só coordenador ou admin
+    // OFFICIAL / ARCHIVED: DOCENTE (antigo COORDENADOR) ou ADMIN
     if ((to === "OFFICIAL" || to === "ARCHIVED") && !canSetOfficialOrArchived(user.role)) {
       return res.status(403).json({
         error:
-          "Apenas COORDENADOR ou ADMIN podem definir estado OFFICIAL ou ARCHIVED",
+          "Apenas DOCENTE ou ADMIN podem definir estado OFFICIAL ou ARCHIVED",
       });
     }
 
-    // DRAFT / IN_REVIEW: owner ou coordenador/admin
+    // DRAFT / IN_REVIEW: owner ou DOCENTE/ADMIN
     if (
       (to === "DRAFT" || to === "IN_REVIEW") &&
       String(bank.owner) !== String(req.userId) &&
@@ -269,7 +270,7 @@ export async function updateBankStatus(req, res) {
     ) {
       return res.status(403).json({
         error:
-          "Apenas o dono do banco (ou COORDENADOR/ADMIN) pode alterar este estado",
+          "Apenas o dono do banco (ou DOCENTE/ADMIN) pode alterar este estado",
       });
     }
 
@@ -395,6 +396,9 @@ export async function exportBank(req, res) {
     }
 
     const questions = await Question.find({ bank: bank._id }).lean();
+
+    // Marca utilização: cada export incrementa 1 uso por questão do banco
+    await Question.updateMany({ bank: bank._id }, { $inc: { usageCount: 1 } });
 
     let content = "";
     let filename = `${bank.title || "banco"}`.replace(/[^a-zA-Z0-9_-]/g, "_");

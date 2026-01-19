@@ -29,9 +29,30 @@ const questionSchema = new mongoose.Schema(
 
     acceptableAnswers: [{ type: String }], // usado em short/open
 
-    difficulty: { type: Number, min: 1, max: 5, default: 2 },
+    // 1=Básico, 2=Normal, 3=Difícil, 4=Muito Difícil
+    difficulty: { type: Number, min: 1, max: 4, default: 2 },
 
+    // Contador de utilizações (ex.: exportação)
+    usageCount: { type: Number, default: 0 },
+
+    // Legacy: mantido para compatibilidade (nomes das chapterTags)
     tags: [{ type: String }],
+
+    // Labels (ex.: "Época Normal")
+    labels: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Label",
+      },
+    ],
+
+    // Tags de capítulos (ex.: "HTML", "CSS")
+    chapterTags: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "ChapterTag",
+      },
+    ],
 
     source: {
       type: String,

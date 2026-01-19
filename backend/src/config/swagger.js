@@ -27,7 +27,7 @@ export const swaggerSpec = {
           id: { type: "string" },
           name: { type: "string" },
           email: { type: "string" },
-          role: { type: "string", enum: ["DOCENTE", "COORDENADOR", "ADMIN"] },
+          role: { type: "string", enum: ["DOCENTE", "ADMIN"] },
         },
       },
       AuthRegisterRequest: {
@@ -39,7 +39,7 @@ export const swaggerSpec = {
           password: { type: "string", example: "123456" },
           role: {
             type: "string",
-            enum: ["DOCENTE", "COORDENADOR", "ADMIN"],
+            enum: ["DOCENTE", "ADMIN"],
             example: "DOCENTE",
           },
         },
@@ -119,8 +119,11 @@ export const swaggerSpec = {
             type: "array",
             items: { type: "string" },
           },
-          difficulty: { type: "integer", minimum: 1, maximum: 5 },
+          difficulty: { type: "integer", minimum: 1, maximum: 4 },
+          usageCount: { type: "integer", minimum: 0 },
           tags: { type: "array", items: { type: "string" } },
+          labels: { type: "array", items: { type: "string" } },
+          chapterTags: { type: "array", items: { type: "string" } },
           status: {
             type: "string",
             enum: ["DRAFT", "IN_REVIEW", "APPROVED"],
@@ -151,8 +154,10 @@ export const swaggerSpec = {
             type: "array",
             items: { type: "string" },
           },
-          difficulty: { type: "integer", minimum: 1, maximum: 5 },
+          difficulty: { type: "integer", minimum: 1, maximum: 4 },
           tags: { type: "array", items: { type: "string" } },
+          labels: { type: "array", items: { type: "string" } },
+          chapterTags: { type: "array", items: { type: "string" } },
         },
       },
     },
@@ -548,6 +553,316 @@ export const swaggerSpec = {
         responses: {
           200: { description: "Questão apagada" },
           404: { description: "Questão não encontrada" },
+        },
+      },
+    },
+
+    "/labels": {
+      get: {
+        summary: "Listar labels disponíveis",
+        tags: ["Labels"],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "includeInactive",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["0", "1"] },
+          },
+        ],
+        responses: {
+          200: { description: "Lista de labels" },
+        },
+      },
+      post: {
+        summary: "Criar/reutilizar label",
+        tags: ["Labels"],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["name"],
+                properties: { name: { type: "string" } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Label criada ou existente" },
+          400: { description: "Dados inválidos" },
+        },
+      },
+    },
+    "/labels/{id}": {
+      put: {
+        summary: "Editar label",
+        tags: ["Labels"],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  isActive: { type: "boolean" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Label atualizada" },
+          404: { description: "Não encontrada" },
+        },
+      },
+      delete: {
+        summary: "Desativar label",
+        tags: ["Labels"],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          200: { description: "Label desativada" },
+          404: { description: "Não encontrada" },
+        },
+      },
+    },
+
+    "/chapter-tags": {
+      get: {
+        summary: "Listar tags de capítulos disponíveis",
+        tags: ["Chapter Tags"],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "includeInactive",
+            in: "query",
+            required: false,
+            schema: { type: "string", enum: ["0", "1"] },
+          },
+        ],
+        responses: {
+          200: { description: "Lista de tags" },
+        },
+      },
+      post: {
+        summary: "Criar/reutilizar tag de capítulo",
+        tags: ["Chapter Tags"],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["name"],
+                properties: { name: { type: "string" } },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Tag criada ou existente" },
+          400: { description: "Dados inválidos" },
+        },
+      },
+    },
+    "/chapter-tags/{id}": {
+      put: {
+        summary: "Editar tag de capítulo",
+        tags: ["Chapter Tags"],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  isActive: { type: "boolean" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Tag atualizada" },
+          404: { description: "Não encontrada" },
+        },
+      },
+      delete: {
+        summary: "Desativar tag de capítulo",
+        tags: ["Chapter Tags"],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          200: { description: "Tag desativada" },
+          404: { description: "Não encontrada" },
+        },
+      },
+    },
+
+    // ============ AI Routes ============
+    "/ai/config": {
+      get: {
+        summary: "Obter configuração de IA",
+        tags: ["IA (Groq)"],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: { description: "Configuração atual" },
+        },
+      },
+      post: {
+        summary: "Configurar API key do Groq",
+        tags: ["IA (Groq)"],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["apiKey"],
+                properties: {
+                  apiKey: { type: "string", description: "API key do Groq" },
+                  model: { type: "string", description: "Modelo a usar (opcional)" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Configuração guardada" },
+          400: { description: "API key inválida" },
+        },
+      },
+    },
+    "/ai/models": {
+      get: {
+        summary: "Listar modelos de IA disponíveis",
+        tags: ["IA (Groq)"],
+        security: [{ bearerAuth: [] }],
+        responses: {
+          200: { description: "Lista de modelos" },
+        },
+      },
+    },
+    "/ai/generate-questions": {
+      post: {
+        summary: "Gerar questões usando IA",
+        tags: ["IA (Groq)"],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  bankId: { type: "string", description: "ID do banco para guardar (opcional)" },
+                  topic: { type: "string", example: "HTML Forms", description: "Tópico para gerar questões" },
+                  content: { type: "string", description: "Conteúdo/texto de referência" },
+                  numQuestions: { type: "integer", default: 5, description: "Número de questões" },
+                  types: {
+                    type: "array",
+                    items: { type: "string", enum: ["MULTIPLE_CHOICE", "TRUE_FALSE", "SHORT_ANSWER", "OPEN"] },
+                    default: ["MULTIPLE_CHOICE"],
+                  },
+                  difficulties: {
+                    type: "array",
+                    items: { type: "integer", minimum: 1, maximum: 4 },
+                    default: [2],
+                    description: "1=Básico, 2=Normal, 3=Difícil, 4=Muito Difícil",
+                  },
+                  chapterTags: { type: "array", items: { type: "string" }, description: "Tags de capítulos" },
+                  labels: { type: "array", items: { type: "string" }, description: "Labels (ex: Época Normal)" },
+                  language: { type: "string", default: "pt-PT" },
+                  additionalInstructions: { type: "string", description: "Instruções adicionais para a IA" },
+                  saveToBank: { type: "boolean", default: false, description: "Guardar questões no banco" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Questões geradas com sucesso" },
+          400: { description: "Parâmetros inválidos ou API key não configurada" },
+        },
+      },
+    },
+    "/ai/improve-question": {
+      post: {
+        summary: "Melhorar uma questão existente usando IA",
+        tags: ["IA (Groq)"],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  questionId: { type: "string", description: "ID da questão existente" },
+                  question: {
+                    type: "object",
+                    description: "Questão a melhorar (alternativa a questionId)",
+                    properties: {
+                      stem: { type: "string" },
+                      type: { type: "string" },
+                      options: { type: "array" },
+                    },
+                  },
+                  instructions: { type: "string", description: "Instruções específicas para melhoria" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Questão melhorada" },
+          400: { description: "Dados inválidos" },
+        },
+      },
+    },
+    "/ai/generate-distractors": {
+      post: {
+        summary: "Gerar distratores (opções erradas) para uma questão",
+        tags: ["IA (Groq)"],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["stem", "correctAnswer"],
+                properties: {
+                  stem: { type: "string", description: "Enunciado da questão" },
+                  correctAnswer: { type: "string", description: "Resposta correta" },
+                  numDistractors: { type: "integer", default: 3, description: "Número de distratores" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Distratores gerados" },
+          400: { description: "Dados inválidos" },
         },
       },
     },

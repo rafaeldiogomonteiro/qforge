@@ -28,6 +28,11 @@ export async function register(req, res) {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
+    const allowedRoles = ["DOCENTE", "ADMIN"];
+    if (role !== undefined && role !== null && role !== "" && !allowedRoles.includes(role)) {
+      return res.status(400).json({ error: "role inválido" });
+    }
+
     const user = await User.create({
       name,
       email,

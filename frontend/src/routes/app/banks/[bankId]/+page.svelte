@@ -210,7 +210,7 @@
               </div>
 
               <div style="display:flex; gap: 8px;">
-                <a class="btn" href={`/app/questions/${q._id}/edit`}>Editar</a>
+                <a class="btn" href={`/app/banks/${bank._id}/questions/${q._id}/edit`}>Editar</a>
               </div>
             </div>
 

@@ -13,25 +13,40 @@ import Label from "../models/Label.js";
 
 /**
  * Obtém a API key do Groq (do provider configurado ou env)
+ * Retorna objeto com apiKey, providerConfigId e model
  */
-async function getGroqApiKey(userId) {
-  // 1. Tenta buscar config do utilizador
+async function getGroqProvider(userId) {
   const config = await AiProviderConfig.findOne({
     provider: "groq",
     isActive: true,
     $or: [{ createdBy: userId }, { createdBy: { $exists: false } }],
   }).sort({ createdBy: -1 }); // Prefere config do utilizador
 
-  if (config?.apiKey) {
-    return config.apiKey;
+  if (config?.apiKeyEncrypted) {
+    return {
+      apiKey: config.getApiKey(), // Desencripta
+      providerConfigId: config._id,
+      model: config.model || GROQ_MODELS.LLAMA_3_3_70B,
+    };
   }
 
-  // 2. Fallback para variável de ambiente
   if (process.env.GROQ_API_KEY) {
-    return process.env.GROQ_API_KEY;
+    return {
+      apiKey: process.env.GROQ_API_KEY,
+      providerConfigId: null,
+      model: GROQ_MODELS.LLAMA_3_3_70B,
+    };
   }
 
-  return null;
+  return { apiKey: null, providerConfigId: null, model: GROQ_MODELS.LLAMA_3_3_70B };
+}
+
+/**
+ * Helper simples para obter só a apiKey (usado em improve/distractors)
+ */
+async function getGroqApiKey(userId) {
+  const provider = await getGroqProvider(userId);
+  return provider.apiKey;
 }
 
 /**
@@ -52,6 +67,7 @@ export async function generateQuestionsHandler(req, res) {
       language = "pt-PT",
       additionalInstructions = "",
       saveToBank = false,
+      requireApproval = false,
     } = req.body;
 
     // Validação básica
@@ -61,18 +77,23 @@ export async function generateQuestionsHandler(req, res) {
         .json({ error: "É necessário fornecer 'topic' ou 'content'" });
     }
 
-    // Obtém API key
-    const apiKey = await getGroqApiKey(req.userId);
-    if (!apiKey) {
+    const provider = await getGroqProvider(req.userId);
+    if (!provider.apiKey) {
       return res.status(400).json({
         error:
           "API key do Groq não configurada. Configure em /ai/config ou defina GROQ_API_KEY no ambiente.",
       });
     }
 
-    // Valida banco se for guardar
+    if (requireApproval && !bankId) {
+      return res
+        .status(400)
+        .json({ error: "requireApproval exige bankId (para rever/aprovar e guardar)" });
+    }
+
+    // Valida banco se for guardar (saveToBank) OU se for workflow de aprovação
     let bank = null;
-    if (saveToBank && bankId) {
+    if ((saveToBank || requireApproval) && bankId) {
       bank = await QuestionBank.findById(bankId);
       if (!bank) {
         return res.status(404).json({ error: "Banco de questões não encontrado" });
@@ -85,7 +106,8 @@ export async function generateQuestionsHandler(req, res) {
     }
 
     // Gera questões
-    const result = await generateQuestions(apiKey, {
+    const result = await generateQuestions(provider.apiKey, {
+      model: provider.model,
       topic,
       content,
       numQuestions,
@@ -96,14 +118,46 @@ export async function generateQuestionsHandler(req, res) {
       additionalInstructions,
     });
 
+    // Workflow: devolve sugestões para revisão/aprovação
+    if (requireApproval && bank) {
+      const generation = await AiGeneration.create({
+        user: req.userId,
+        bank: bank._id,
+        providerConfig: provider.providerConfigId,
+        prompt: `Topic: ${topic || ""}\nContent: ${content || ""}`,
+        params: {
+          numQuestions,
+          types,
+          difficulty: difficulties,
+          language,
+        },
+        suggestedQuestions: result.questions,
+        status: "PENDING",
+        questionIds: [],
+        rawResponse: result.rawResponse,
+      });
+
+      return res.json({
+        success: true,
+        mode: "approval",
+        generationId: generation._id,
+        bankId: bank._id,
+        suggestions: generation.suggestedQuestions,
+        model: result.model,
+        message: "Sugestões geradas. Revê/edita e aprova em /ai/generations/:id/approve",
+      });
+    }
+
     // Se saveToBank, guarda as questões no banco
     let savedQuestions = [];
     if (saveToBank && bank) {
-      // Processa chapterTags (cria se não existir)
-      const chapterTagIds = await upsertChapterTags(chapterTags);
-      const labelIds = await upsertLabels(labels);
-
       for (const q of result.questions) {
+        const finalChapterTags = Array.isArray(q.chapterTags) && q.chapterTags.length > 0 ? q.chapterTags : chapterTags;
+        const finalLabels = Array.isArray(q.labels) && q.labels.length > 0 ? q.labels : labels;
+
+        const chapterTagIds = await upsertChapterTags(finalChapterTags);
+        const labelIds = await upsertLabels(finalLabels);
+
         const question = await Question.create({
           bank: bank._id,
           type: q.type,
@@ -111,7 +165,7 @@ export async function generateQuestionsHandler(req, res) {
           options: q.options,
           acceptableAnswers: q.acceptableAnswers,
           difficulty: q.difficulty,
-          tags: chapterTags, // legacy
+          tags: finalChapterTags, // legacy
           chapterTags: chapterTagIds,
           labels: labelIds,
           source: "AI",
@@ -125,7 +179,7 @@ export async function generateQuestionsHandler(req, res) {
       await AiGeneration.create({
         user: req.userId,
         bank: bank._id,
-        providerConfig: null, // TODO: guardar ref se usar config
+        providerConfig: provider.providerConfigId,
         prompt: `Topic: ${topic || ""}\nContent: ${content || ""}`,
         params: {
           numQuestions,
@@ -134,6 +188,8 @@ export async function generateQuestionsHandler(req, res) {
           language,
         },
         questionIds: savedQuestions.map((q) => q._id),
+        suggestedQuestions: result.questions,
+        status: "APPLIED",
         rawResponse: result.rawResponse,
       });
     }
@@ -152,6 +208,136 @@ export async function generateQuestionsHandler(req, res) {
     res.status(500).json({
       error: err.message || "Erro ao gerar questões",
     });
+  }
+}
+
+/**
+ * GET /ai/generations/:id
+ * Ver uma geração (sugestões) para revisão
+ */
+export async function getGenerationHandler(req, res) {
+  try {
+    const { id } = req.params;
+    const generation = await AiGeneration.findById(id)
+      .populate("bank", "title")
+      .lean();
+
+    if (!generation) {
+      return res.status(404).json({ error: "Geração não encontrada" });
+    }
+
+    if (String(generation.user) !== String(req.userId)) {
+      return res.status(403).json({ error: "Sem permissão" });
+    }
+
+    res.json(generation);
+  } catch (err) {
+    console.error("Erro em getGenerationHandler:", err);
+    res.status(500).json({ error: "Erro ao obter geração" });
+  }
+}
+
+/**
+ * POST /ai/generations/:id/approve
+ * Aprovar/aplicar sugestões (com edições opcionais) e criar questões no banco
+ */
+export async function approveGenerationHandler(req, res) {
+  try {
+    const { id } = req.params;
+    const { approvals } = req.body || {};
+
+    const generation = await AiGeneration.findById(id);
+    if (!generation) {
+      return res.status(404).json({ error: "Geração não encontrada" });
+    }
+
+    if (String(generation.user) !== String(req.userId)) {
+      return res.status(403).json({ error: "Sem permissão" });
+    }
+
+    if (generation.status !== "PENDING") {
+      return res.status(400).json({ error: `Geração não está pendente (status=${generation.status})` });
+    }
+
+    const bank = await QuestionBank.findById(generation.bank);
+    if (!bank) {
+      return res.status(404).json({ error: "Banco de questões não encontrado" });
+    }
+    if (String(bank.owner) !== String(req.userId)) {
+      return res.status(403).json({ error: "Não tens permissão para gravar neste banco" });
+    }
+
+    const suggestions = Array.isArray(generation.suggestedQuestions)
+      ? generation.suggestedQuestions
+      : [];
+
+    // Se não vier approvals, aprova tudo
+    const normalizedApprovals = Array.isArray(approvals)
+      ? approvals
+      : suggestions.map((_, index) => ({ index, approved: true }));
+
+    const created = [];
+    const rejectedIndexes = [];
+
+    for (const item of normalizedApprovals) {
+      const index = Number(item?.index);
+      if (!Number.isInteger(index) || index < 0 || index >= suggestions.length) {
+        continue;
+      }
+
+      if (item?.approved === false) {
+        rejectedIndexes.push(index);
+        continue;
+      }
+
+      const base = suggestions[index] || {};
+      const edits = item?.edits || {};
+      const merged = {
+        ...base,
+        ...edits,
+      };
+
+      const finalLabels = Array.isArray(merged.labels) ? merged.labels : [];
+      const finalChapterTags = Array.isArray(merged.chapterTags) ? merged.chapterTags : [];
+
+      const labelIds = await upsertLabels(finalLabels);
+      const chapterTagIds = await upsertChapterTags(finalChapterTags);
+
+      const question = await Question.create({
+        bank: bank._id,
+        type: merged.type,
+        stem: merged.stem,
+        options: Array.isArray(merged.options) ? merged.options : [],
+        acceptableAnswers: Array.isArray(merged.acceptableAnswers)
+          ? merged.acceptableAnswers
+          : [],
+        difficulty: merged.difficulty,
+        tags: finalChapterTags, // legacy
+        chapterTags: chapterTagIds,
+        labels: labelIds,
+        source: "AI",
+        status: "DRAFT",
+        createdBy: req.userId,
+      });
+
+      created.push(question);
+    }
+
+    generation.questionIds = created.map((q) => q._id);
+    generation.status = "APPLIED";
+    await generation.save();
+
+    res.json({
+      success: true,
+      generationId: generation._id,
+      createdCount: created.length,
+      createdQuestionIds: created.map((q) => q._id),
+      rejectedIndexes,
+      status: generation.status,
+    });
+  } catch (err) {
+    console.error("Erro em approveGenerationHandler:", err);
+    res.status(500).json({ error: err.message || "Erro ao aprovar geração" });
   }
 }
 
@@ -357,6 +543,10 @@ async function upsertChapterTags(names) {
       { $setOnInsert: { name: String(name).trim(), normalizedName, isActive: true } },
       { new: true, upsert: true }
     );
+    if (tag && tag.isActive === false) {
+      tag.isActive = true;
+      await tag.save();
+    }
     ids.push(tag._id);
   }
   return ids;
@@ -373,6 +563,10 @@ async function upsertLabels(names) {
       { $setOnInsert: { name: String(name).trim(), normalizedName, isActive: true } },
       { new: true, upsert: true }
     );
+    if (label && label.isActive === false) {
+      label.isActive = true;
+      await label.save();
+    }
     ids.push(label._id);
   }
   return ids;

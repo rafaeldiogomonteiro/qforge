@@ -17,7 +17,7 @@ const aiGenerationSchema = new mongoose.Schema(
     providerConfig: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "AiProviderConfig",
-      required: true
+      required: false
     },
 
     prompt: { type: String, required: true },  // o pedido feito à IA
@@ -32,6 +32,19 @@ const aiGenerationSchema = new mongoose.Schema(
     questionIds: [
       { type: mongoose.Schema.Types.ObjectId, ref: "Question" }
     ],
+
+    // Questões sugeridas pela IA (antes de aprovar/aplicar)
+    suggestedQuestions: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: []
+    },
+
+    // Workflow de aprovação
+    status: {
+      type: String,
+      enum: ["PENDING", "APPLIED", "REJECTED"],
+      default: "APPLIED"
+    },
 
     rawResponse: { type: Object } // opcional: debug/trace
   },

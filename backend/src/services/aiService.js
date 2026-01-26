@@ -79,6 +79,9 @@ FORMATO DE RESPOSTA (JSON):
     {
       "type": "MULTIPLE_CHOICE|TRUE_FALSE|SHORT_ANSWER|OPEN",
       "stem": "Enunciado da questão",
+      "difficulty": 1,
+      "labels": ["Época Normal"],
+      "chapterTags": ["HTML", "CSS"],
       "options": [
         { "text": "Opção A", "isCorrect": false },
         { "text": "Opção B", "isCorrect": true },
@@ -94,6 +97,8 @@ FORMATO DE RESPOSTA (JSON):
 NOTAS:
 - "options" só é usado em MULTIPLE_CHOICE e TRUE_FALSE
 - "acceptableAnswers" só é usado em SHORT_ANSWER e OPEN
+- "difficulty" deve ser um inteiro: 1=Básico, 2=Normal, 3=Difícil, 4=Muito Difícil
+- "labels" e "chapterTags" devem ser arrays de strings (0+ itens)
 - Inclui sempre "explanation" para feedback ao aluno`;
 }
 
@@ -204,9 +209,23 @@ export async function generateQuestions(apiKey, params) {
   }
 
   // Normaliza e valida questões
+  const clampDifficulty = (value, fallback = 2) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return fallback;
+    return Math.min(4, Math.max(1, Math.round(num)));
+  };
+
+  const asStringArray = (value) => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((v) => (typeof v === "string" ? v.trim() : ""))
+      .filter(Boolean);
+  };
+
   const questions = parsed.questions.map((q, idx) => {
-    const difficulty =
+    const fallbackDifficulty =
       difficulties[idx % difficulties.length] || difficulties[0] || 2;
+    const difficulty = clampDifficulty(q.difficulty, fallbackDifficulty);
 
     return {
       type: q.type || types[idx % types.length] || "MULTIPLE_CHOICE",
@@ -216,6 +235,8 @@ export async function generateQuestions(apiKey, params) {
         ? q.acceptableAnswers
         : [],
       difficulty,
+      labels: asStringArray(q.labels),
+      chapterTags: asStringArray(q.chapterTags),
       explanation: q.explanation || "",
       source: "AI",
     };

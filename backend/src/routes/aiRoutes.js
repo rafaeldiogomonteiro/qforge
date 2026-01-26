@@ -2,6 +2,8 @@ import express from "express";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 import {
   generateQuestionsHandler,
+  getGenerationHandler,
+  approveGenerationHandler,
   improveQuestionHandler,
   generateDistractorsHandler,
   listModelsHandler,
@@ -23,6 +25,10 @@ router.get("/models", listModelsHandler);
 
 // Geração de questões
 router.post("/generate-questions", generateQuestionsHandler);
+
+// Review/approve workflow
+router.get("/generations/:id", getGenerationHandler);
+router.post("/generations/:id/approve", approveGenerationHandler);
 
 // Melhorar questão
 router.post("/improve-question", improveQuestionHandler);

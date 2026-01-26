@@ -794,6 +794,11 @@ export const swaggerSpec = {
                   language: { type: "string", default: "pt-PT" },
                   additionalInstructions: { type: "string", description: "Instruções adicionais para a IA" },
                   saveToBank: { type: "boolean", default: false, description: "Guardar questões no banco" },
+                  requireApproval: {
+                    type: "boolean",
+                    default: false,
+                    description: "Se true, cria uma geração PENDING para revisão/aprovação antes de guardar (requer bankId)",
+                  },
                 },
               },
             },
@@ -802,6 +807,73 @@ export const swaggerSpec = {
         responses: {
           200: { description: "Questões geradas com sucesso" },
           400: { description: "Parâmetros inválidos ou API key não configurada" },
+        },
+      },
+    },
+
+    "/ai/generations/{id}": {
+      get: {
+        summary: "Obter geração de IA (sugestões) por ID",
+        tags: ["IA (Groq)"],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          200: { description: "Geração" },
+          404: { description: "Não encontrada" },
+        },
+      },
+    },
+    "/ai/generations/{id}/approve": {
+      post: {
+        summary: "Aprovar/aplicar sugestões e criar questões no banco",
+        tags: ["IA (Groq)"],
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  approvals: {
+                    type: "array",
+                    description: "Lista de decisões por índice; se omitido aprova tudo",
+                    items: {
+                      type: "object",
+                      required: ["index"],
+                      properties: {
+                        index: { type: "integer", minimum: 0 },
+                        approved: { type: "boolean", default: true },
+                        edits: {
+                          type: "object",
+                          description: "Edições opcionais antes de guardar",
+                          properties: {
+                            type: { type: "string" },
+                            stem: { type: "string" },
+                            difficulty: { type: "integer", minimum: 1, maximum: 4 },
+                            labels: { type: "array", items: { type: "string" } },
+                            chapterTags: { type: "array", items: { type: "string" } },
+                            options: { type: "array" },
+                            acceptableAnswers: { type: "array", items: { type: "string" } },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Aplicado com sucesso" },
+          400: { description: "Geração não pendente ou dados inválidos" },
+          404: { description: "Não encontrada" },
         },
       },
     },

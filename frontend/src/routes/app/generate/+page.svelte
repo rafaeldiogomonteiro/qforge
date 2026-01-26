@@ -3,9 +3,20 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
 
+  const DIFFICULTY_LABELS = {
+    1: "Básico",
+    2: "Normal",
+    3: "Difícil",
+    4: "Muito Difícil"
+  };
+
   // bancos (para escolher destino se quiseres guardar)
   let banks = [];
   let banksLoading = true;
+
+  // Available labels and chapter tags
+  let availableLabels = [];
+  let availableChapterTags = [];
 
   // form
   let bankId = ""; // opcional
@@ -16,38 +27,45 @@
   let types = ["MULTIPLE_CHOICE"];
   let difficulties = [2];
 
-  let chapterTagsText = ""; // ids separados por vírgula (opcional)
-  let labelsText = ""; // ids separados por vírgula (opcional)
+  let selectedLabels = []; // array of label IDs
+  let selectedChapterTags = []; // array of chapter tag IDs
 
   let language = "pt-PT";
   let additionalInstructions = "";
-  let saveToBank = false;
 
   // resultado
   let generating = false;
   let error = "";
   let generated = []; // array de Question
+  
+  // confirmation modal
+  let showConfirmModal = false;
+  
+  // save to bank modal
+  let showSaveToBankModal = false;
+  let savingToBank = false;
+  let selectedBankForSave = "";
 
   onMount(loadBanks);
 
   async function loadBanks() {
     banksLoading = true;
     try {
-      const res = await api.get("/banks");
-      banks = res.data?.data ?? [];
+      const [banksRes, labelsRes, chapterTagsRes] = await Promise.all([
+        api.get("/banks"),
+        api.get("/labels"),
+        api.get("/chapter-tags")
+      ]);
+      
+      banks = banksRes.data?.data ?? [];
+      availableLabels = labelsRes.data || [];
+      availableChapterTags = chapterTagsRes.data || [];
     } catch (e) {
       // não bloqueia a página
       banks = [];
     } finally {
       banksLoading = false;
     }
-  }
-
-  function parseIds(text) {
-    return text
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean);
   }
 
   function typeLabel(type) {
@@ -63,15 +81,30 @@
     if (!topic.trim() && !content.trim()) {
       return "Indica pelo menos um 'topic' ou 'content' para gerar.";
     }
-    if (saveToBank && !bankId) {
-      return "Se 'Guardar no banco' estiver ativo, tens de escolher um banco.";
-    }
     if (numQuestions < 1 || numQuestions > 50) {
       return "numQuestions deve estar entre 1 e 50.";
     }
     return null;
   }
 
+  function openConfirmModal() {
+    const v = validate();
+    if (v) {
+      error = v;
+      return;
+    }
+    showConfirmModal = true;
+  }
+  
+  function closeConfirmModal() {
+    showConfirmModal = false;
+  }
+  
+  async function confirmAndGenerate() {
+    showConfirmModal = false;
+    await generate();
+  }
+  
   async function generate() {
     error = "";
     generated = [];
@@ -92,21 +125,61 @@
         numQuestions: Number(numQuestions),
         types,
         difficulties,
-        chapterTags: parseIds(chapterTagsText),
-        labels: parseIds(labelsText),
+        chapterTags: selectedChapterTags,
+        labels: selectedLabels,
         language,
         additionalInstructions,
-        saveToBank: Boolean(saveToBank)
+        saveToBank: Boolean(bankId) // Se tiver banco selecionado, guarda automaticamente
       };
 
       const { data } = await api.post("/ai/generate-questions", payload);
 
-      // não sabemos se vem {data:[...]} ou [...] -> suportar ambos:
-      generated = data?.data ?? data ?? [];
+      // Backend retorna { success: true, questions: [...] }
+      generated = data?.questions || [];
+      
+      console.log('Questões geradas:', generated);
     } catch (e) {
       error = e?.response?.data?.message || "Erro ao gerar questões com IA.";
     } finally {
       generating = false;
+    }
+  }
+  
+  function openSaveToBankModal() {
+    selectedBankForSave = bankId || "";
+    showSaveToBankModal = true;
+  }
+  
+  function closeSaveToBankModal() {
+    showSaveToBankModal = false;
+    selectedBankForSave = "";
+  }
+  
+  async function saveQuestionsToBank() {
+    if (!selectedBankForSave) {
+      error = "Seleciona um banco.";
+      return;
+    }
+    
+    savingToBank = true;
+    error = "";
+    
+    try {
+      // Criar cada questão no banco
+      for (const q of generated) {
+        await api.post("/questions", {
+          ...q,
+          bankId: selectedBankForSave
+        });
+      }
+      
+      showSaveToBankModal = false;
+      bankId = selectedBankForSave; // Atualizar bankId para refletir que foi guardado
+      alert(`${generated.length} questões guardadas com sucesso!`);
+    } catch (e) {
+      error = e?.response?.data?.message || "Erro ao guardar questões.";
+    } finally {
+      savingToBank = false;
     }
   }
 </script>
@@ -124,30 +197,6 @@
   <!-- FORM -->
   <div style="background:white; border:1px solid var(--border); border-radius:14px; padding:16px;">
     <form on:submit|preventDefault={generate} style="display:grid; gap: 12px;">
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-        <div>
-          <label style="font-size: 13px; color: var(--muted);">Banco (opcional)</label>
-          <select
-            bind:value={bankId}
-            disabled={banksLoading}
-            style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
-          >
-            <option value="">— Não guardar / sem banco —</option>
-            {#each banks as b}
-              <option value={b._id}>{b.title}</option>
-            {/each}
-          </select>
-        </div>
-
-        <div>
-          <label style="font-size: 13px; color: var(--muted);">Guardar no banco</label>
-          <div style="margin-top:6px; display:flex; align-items:center; gap:10px;">
-            <input type="checkbox" bind:checked={saveToBank} />
-            <span style="font-size:14px;">saveToBank</span>
-          </div>
-        </div>
-      </div>
-
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
         <div>
           <label style="font-size: 13px; color: var(--muted);">Nº questões</label>
@@ -216,10 +265,10 @@
             bind:value={difficulties}
             style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
           >
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
+            <option value={1}>1 - Básico</option>
+            <option value={2}>2 - Normal</option>
+            <option value={3}>3 - Difícil</option>
+            <option value={4}>4 - Muito Difícil</option>
           </select>
           <p style="margin:6px 0 0; font-size:12px; color: var(--muted);">
             Ctrl/Cmd para selecionar múltiplos.
@@ -227,23 +276,59 @@
         </div>
       </div>
 
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-        <div>
-          <label style="font-size: 13px; color: var(--muted);">chapterTags (ObjectId, vírgulas)</label>
-          <input
-            bind:value={chapterTagsText}
-            placeholder="ex.: 65ab..., 65ac..."
-            style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
-          />
+      <!-- Labels -->
+      <div>
+        <label style="font-size: 13px; color: var(--muted);">Labels (opcional)</label>
+        <div style="margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 150px; overflow-y: auto;">
+          {#if availableLabels.length === 0}
+            <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma label disponível. <a href="/app/labels">Criar labels</a></p>
+          {:else}
+            {#each availableLabels as label}
+              <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer;">
+                <input
+                  type="checkbox"
+                  value={label._id}
+                  checked={selectedLabels.includes(label._id)}
+                  on:change={(e) => {
+                    if (e.target.checked) {
+                      selectedLabels = [...selectedLabels, label._id];
+                    } else {
+                      selectedLabels = selectedLabels.filter(id => id !== label._id);
+                    }
+                  }}
+                />
+                <span style="font-size: 14px;">{label.name}</span>
+              </label>
+            {/each}
+          {/if}
         </div>
+      </div>
 
-        <div>
-          <label style="font-size: 13px; color: var(--muted);">labels (ObjectId, vírgulas)</label>
-          <input
-            bind:value={labelsText}
-            placeholder="ex.: 65bb..., 65bc..."
-            style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
-          />
+      <!-- Chapter Tags -->
+      <div>
+        <label style="font-size: 13px; color: var(--muted);">Chapter Tags (opcional)</label>
+        <div style="margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 150px; overflow-y: auto;">
+          {#if availableChapterTags.length === 0}
+            <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma tag disponível. <a href="/app/chapter-tags">Criar tags</a></p>
+          {:else}
+            {#each availableChapterTags as tag}
+              <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer;">
+                <input
+                  type="checkbox"
+                  value={tag._id}
+                  checked={selectedChapterTags.includes(tag._id)}
+                  on:change={(e) => {
+                    if (e.target.checked) {
+                      selectedChapterTags = [...selectedChapterTags, tag._id];
+                    } else {
+                      selectedChapterTags = selectedChapterTags.filter(id => id !== tag._id);
+                    }
+                  }}
+                />
+                <span style="font-size: 14px;">{tag.name}</span>
+              </label>
+            {/each}
+          {/if}
         </div>
       </div>
 
@@ -262,15 +347,10 @@
       {/if}
 
       <div style="display:flex; gap:10px;">
-        <button class="btn" type="submit" disabled={generating} style="padding:10px 14px;">
+        <button class="btn" type="button" on:click={openConfirmModal} disabled={generating} style="padding:10px 14px;">
           {generating ? "A gerar..." : "Gerar"}
         </button>
 
-        {#if saveToBank && bankId}
-          <button class="btn" type="button" on:click={() => goto(`/app/banks/${bankId}`)}>
-            Ir ao banco
-          </button>
-        {/if}
       </div>
     </form>
   </div>
@@ -311,4 +391,147 @@
         {/each}
       </div>
 
-      <p style="margin-top: 10
+      <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+        <button class="btn btn-confirm" type="button" on:click={openSaveToBankModal}>
+          💾 Guardar no Banco
+        </button>
+      </div>
+    {/if}
+  </div>
+</div>
+
+<!-- Confirmation Modal -->
+{#if showConfirmModal}
+  <div class="modal-overlay" on:click={closeConfirmModal}>
+    <div class="modal-content" on:click|stopPropagation>
+      <h3 style="margin: 0 0 16px 0; font-size: 18px;">Confirmar Geração</h3>
+      <p style="margin: 0 0 24px 0; color: var(--muted); line-height: 1.5;">
+        Tem a certeza que deseja gerar {numQuestions} {numQuestions === 1 ? 'questão' : 'questões'} com IA?
+        {#if bankId}
+          <br/><strong style="color: var(--text);">As questões serão guardadas no banco selecionado.</strong>
+        {/if}
+      </p>
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button class="btn" type="button" on:click={closeConfirmModal}>
+          Cancelar
+        </button>
+        <button 
+          class="btn btn-confirm" 
+          type="button" 
+          on:click={confirmAndGenerate}
+        >
+          Confirmar
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Save to Bank Modal -->
+{#if showSaveToBankModal}
+  <div class="modal-overlay" on:click={closeSaveToBankModal}>
+    <div class="modal-content" on:click|stopPropagation>
+      <h3 style="margin: 0 0 16px 0; font-size: 18px;">Guardar no Banco</h3>
+      <p style="margin: 0 0 12px 0; color: var(--muted); line-height: 1.5;">
+        Seleciona o banco onde pretendes guardar as {generated.length} {generated.length === 1 ? 'questão' : 'questões'}:
+      </p>
+      
+      <select 
+        bind:value={selectedBankForSave}
+        style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 20px;"
+      >
+        <option value="">-- Selecionar banco --</option>
+        {#each banks as bank}
+          <option value={bank._id}>{bank.title}</option>
+        {/each}
+      </select>
+      
+      {#if error}
+        <div style="color: #b91c1c; font-size: 14px; margin-bottom: 16px;">{error}</div>
+      {/if}
+      
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button class="btn" type="button" on:click={closeSaveToBankModal} disabled={savingToBank}>
+          Cancelar
+        </button>
+        <button 
+          class="btn btn-confirm" 
+          type="button" 
+          on:click={saveQuestionsToBank}
+          disabled={savingToBank || !selectedBankForSave}
+        >
+          {savingToBank ? "A guardar..." : "Guardar"}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<style>
+  .btn {
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: white;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.15s;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: #f9fafb;
+    border-color: #9ca3af;
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  .btn-confirm {
+    background: #3b82f6 !important;
+    color: white !important;
+    border-color: #3b82f6 !important;
+  }
+  
+  .btn-confirm:hover:not(:disabled) {
+    background: #2563eb !important;
+    border-color: #2563eb !important;
+  }
+  
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+  }
+  
+  .modal-content {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    animation: modalFadeIn 0.2s ease-out;
+  }
+  
+  @keyframes modalFadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+</style>
+

@@ -98,7 +98,10 @@ NOTAS:
 - "options" só é usado em MULTIPLE_CHOICE e TRUE_FALSE
 - "acceptableAnswers" só é usado em SHORT_ANSWER e OPEN
 - "difficulty" deve ser um inteiro: 1=Básico, 2=Normal, 3=Difícil, 4=Muito Difícil
-- "labels" e "chapterTags" devem ser arrays de strings (0+ itens)
+- "labels" deve ser array de strings descritivas como ["Época Normal", "Recurso", "Exame Final"]
+- "chapterTags" deve ser array de strings com tópicos/conceitos relevantes (ex: ["HTML", "CSS", "JavaScript"])
+  IMPORTANTE: Os chapterTags devem ser nomes descritivos e específicos do conteúdo/tópico da questão
+  Não uses IDs ou códigos, apenas nomes legíveis como "Programação Linear", "Método Simplex", "HTML Básico", etc.
 - Inclui sempre "explanation" para feedback ao aluno`;
 }
 
@@ -131,7 +134,7 @@ function buildUserPrompt(params) {
   }
 
   if (chapterTags && chapterTags.length > 0) {
-    prompt += `CAPÍTULOS/TAGS: ${chapterTags.join(", ")}\n`;
+    prompt += `CAPÍTULOS/TAGS SUGERIDOS: ${chapterTags.join(", ")} (usa estes como referência mas podes adicionar outros relevantes)\n`;
   }
 
   if (content) {
@@ -141,7 +144,9 @@ function buildUserPrompt(params) {
   prompt += `\nREQUISITOS:
 - Tipos de questão: ${typeDescriptions}
 - Níveis de dificuldade: ${difficultyDescriptions}
-- Distribui as questões pelos tipos e dificuldades pedidos`;
+- Distribui as questões pelos tipos e dificuldades pedidos
+- Para cada questão, identifica 1-3 chapter tags relevantes (tópicos/conceitos abordados)
+- Usa nomes descritivos para os chapter tags (ex: "HTML Básico", "CSS Flexbox", "JavaScript Arrays")`;
 
   if (additionalInstructions) {
     prompt += `\n\nINSTRUÇÕES ADICIONAIS: ${additionalInstructions}`;

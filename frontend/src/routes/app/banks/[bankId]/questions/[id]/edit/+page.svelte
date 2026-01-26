@@ -13,6 +13,17 @@
     { value: "OPEN", label: "Resposta aberta" }
   ];
 
+  const DIFFICULTY_LABELS = {
+    1: "Básico",
+    2: "Normal",
+    3: "Difícil",
+    4: "Muito Difícil"
+  };
+
+  // Available labels and chapter tags
+  let availableLabels = [];
+  let availableChapterTags = [];
+
   let loading = true;
   let saving = false;
   let error = "";
@@ -23,6 +34,8 @@
   let stem = "";
   let difficulty = 2;
   let tagsText = "";
+  let selectedLabels = []; // array of label IDs
+  let selectedChapterTags = []; // array of chapter tag IDs
   let acceptableAnswersText = "";
   let status = "DRAFT";
   let source = "MANUAL";
@@ -103,6 +116,13 @@
     source = q.source || "MANUAL";
 
     tagsText = (q.tags || []).join(", ");
+    
+    // Extract label IDs
+    selectedLabels = (q.labels || []).map(label => typeof label === 'string' ? label : label._id);
+    
+    // Extract chapter tag IDs
+    selectedChapterTags = (q.chapterTags || []).map(tag => typeof tag === 'string' ? tag : tag._id);
+    
     acceptableAnswersText = (q.acceptableAnswers || []).join("\n");
 
     options = Array.isArray(q.options)
@@ -118,8 +138,16 @@
     error = "";
 
     try {
-      const { data: q } = await api.get(`/questions/${id}`);
-      hydrate(q);
+      const [questionRes, labelsRes, chapterTagsRes] = await Promise.all([
+        api.get(`/questions/${id}`),
+        api.get("/labels"),
+        api.get("/chapter-tags")
+      ]);
+      
+      availableLabels = labelsRes.data || [];
+      availableChapterTags = chapterTagsRes.data || [];
+      
+      hydrate(questionRes.data);
     } catch (e) {
       error = e?.response?.data?.message || "Erro ao carregar a questão.";
     } finally {
@@ -143,6 +171,8 @@
         stem: stem.trim(),
         difficulty: Number(difficulty),
         tags: parseTags(),
+        labels: selectedLabels,
+        chapterTags: selectedChapterTags,
         status,
         source
       };
@@ -212,14 +242,15 @@
         </div>
 
         <div>
-          <label style="font-size: 14px;">Dificuldade (1-4)</label>
-          <input
-            type="number"
-            min="1"
-            max="4"
+          <label style="font-size: 14px;">Dificuldade</label>
+          <select
             bind:value={difficulty}
             style="width: 100%; margin-top: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 10px;"
-          />
+          >
+            {#each Object.entries(DIFFICULTY_LABELS) as [value, label]}
+              <option value={Number(value)}>{value} - {label}</option>
+            {/each}
+          </select>
         </div>
       </div>
 
@@ -258,6 +289,62 @@
           bind:value={tagsText}
           style="width: 100%; margin-top: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 10px;"
         />
+      </div>
+
+      <!-- Labels -->
+      <div>
+        <label style="font-size: 14px;">Labels</label>
+        <div style="margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 150px; overflow-y: auto;">
+          {#if availableLabels.length === 0}
+            <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma label disponível. <a href="/app/labels">Criar labels</a></p>
+          {:else}
+            {#each availableLabels as label}
+              <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer;">
+                <input
+                  type="checkbox"
+                  value={label._id}
+                  checked={selectedLabels.includes(label._id)}
+                  on:change={(e) => {
+                    if (e.target.checked) {
+                      selectedLabels = [...selectedLabels, label._id];
+                    } else {
+                      selectedLabels = selectedLabels.filter(id => id !== label._id);
+                    }
+                  }}
+                />
+                <span style="font-size: 14px;">{label.name}</span>
+              </label>
+            {/each}
+          {/if}
+        </div>
+      </div>
+
+      <!-- Chapter Tags -->
+      <div>
+        <label style="font-size: 14px;">Chapter Tags</label>
+        <div style="margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 150px; overflow-y: auto;">
+          {#if availableChapterTags.length === 0}
+            <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma tag disponível. <a href="/app/chapter-tags">Criar tags</a></p>
+          {:else}
+            {#each availableChapterTags as tag}
+              <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer;">
+                <input
+                  type="checkbox"
+                  value={tag._id}
+                  checked={selectedChapterTags.includes(tag._id)}
+                  on:change={(e) => {
+                    if (e.target.checked) {
+                      selectedChapterTags = [...selectedChapterTags, tag._id];
+                    } else {
+                      selectedChapterTags = selectedChapterTags.filter(id => id !== tag._id);
+                    }
+                  }}
+                />
+                <span style="font-size: 14px;">{tag.name}</span>
+              </label>
+            {/each}
+          {/if}
+        </div>
       </div>
 
       {#if type === "MULTIPLE_CHOICE" || type === "TRUE_FALSE"}

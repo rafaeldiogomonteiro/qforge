@@ -9,11 +9,17 @@
   let loading = true;
   let error = "";
 
+  // Available labels and chapter tags for filters
+  let availableLabels = [];
+  let availableChapterTags = [];
+
   // filtros
   let fType = "ALL";
   let fStatus = "ALL";
   let fSource = "ALL";
   let fDifficulty = "ALL";
+  let fLabels = []; // Array of selected label IDs
+  let fChapterTags = []; // Array of selected chapter tag IDs
   let search = "";
 
   // colapsar opções por questão
@@ -28,11 +34,17 @@
     try {
       const bankId = data.bankId;
 
-      const bankRes = await api.get(`/banks/${bankId}`);
-      bank = bankRes.data;
+      const [bankRes, qRes, labelsRes, tagsRes] = await Promise.all([
+        api.get(`/banks/${bankId}`),
+        api.get(`/banks/${bankId}/questions`),
+        api.get("/labels"),
+        api.get("/chapter-tags")
+      ]);
 
-      const qRes = await api.get(`/banks/${bankId}/questions`);
+      bank = bankRes.data;
       questions = Array.isArray(qRes.data) ? qRes.data : [];
+      availableLabels = labelsRes.data || [];
+      availableChapterTags = tagsRes.data || [];
     } catch (e) {
       error = e?.response?.data?.message || "Erro ao carregar banco.";
     } finally {
@@ -72,6 +84,12 @@
     }
 
     if (kind === "difficulty") {
+      const difficultyLabels = {
+        1: "Básico",
+        2: "Normal",
+        3: "Difícil",
+        4: "Muito Difícil"
+      };
       const map = {
         1: "background:#ecfeff; border-color:#a5f3fc;",
         2: "background:#f0fdf4; border-color:#bbf7d0;",
@@ -82,6 +100,16 @@
     }
 
     return base;
+  }
+
+  function difficultyLabel(value) {
+    const labels = {
+      1: "Básico",
+      2: "Normal",
+      3: "Difícil",
+      4: "Muito Difícil"
+    };
+    return `${value} - ${labels[value] || ""}`;
   }
 
   function toggleExpanded(id) {
@@ -96,6 +124,20 @@
     if (fStatus !== "ALL" && q.status !== fStatus) return false;
     if (fSource !== "ALL" && q.source !== fSource) return false;
     if (fDifficulty !== "ALL" && String(q.difficulty) !== fDifficulty) return false;
+
+    // Filter by labels
+    if (fLabels.length > 0) {
+      const questionLabelIds = (q.labels || []).map(l => typeof l === 'string' ? l : l._id);
+      const hasSelectedLabel = fLabels.some(labelId => questionLabelIds.includes(labelId));
+      if (!hasSelectedLabel) return false;
+    }
+
+    // Filter by chapter tags
+    if (fChapterTags.length > 0) {
+      const questionTagIds = (q.chapterTags || []).map(t => typeof t === 'string' ? t : t._id);
+      const hasSelectedTag = fChapterTags.some(tagId => questionTagIds.includes(tagId));
+      if (!hasSelectedTag) return false;
+    }
 
     const s = search.trim().toLowerCase();
     if (s) {
@@ -168,10 +210,10 @@
         <label style="font-size: 13px; color: var(--muted);">Dificuldade</label>
         <select bind:value={fDifficulty} style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;">
           <option value="ALL">Todas</option>
-          <option value="1">1</option>
-          <option value="2">2</option>
-          <option value="3">3</option>
-          <option value="4">4</option>
+          <option value="1">1 - Básico</option>
+          <option value="2">2 - Normal</option>
+          <option value="3">3 - Difícil</option>
+          <option value="4">4 - Muito Difícil</option>
         </select>
       </div>
     </div>
@@ -183,6 +225,68 @@
         placeholder="ex.: simplex, restrições, dualidade..."
         style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
       />
+    </div>
+
+    <!-- Labels Filter -->
+    <div style="margin-top: 10px;">
+      <label style="font-size: 13px; color: var(--muted);">Filtrar por Labels</label>
+      <div style="margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 120px; overflow-y: auto; background: white;">
+        {#if availableLabels.length === 0}
+          <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma label disponível</p>
+        {:else}
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            {#each availableLabels as label}
+              <label style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: {fLabels.includes(label._id) ? '#ecfeff' : 'white'}; cursor: pointer; font-size: 13px;">
+                <input
+                  type="checkbox"
+                  value={label._id}
+                  checked={fLabels.includes(label._id)}
+                  on:change={(e) => {
+                    if (e.target.checked) {
+                      fLabels = [...fLabels, label._id];
+                    } else {
+                      fLabels = fLabels.filter(id => id !== label._id);
+                    }
+                  }}
+                  style="margin: 0;"
+                />
+                <span>{label.name}</span>
+              </label>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    </div>
+
+    <!-- Chapter Tags Filter -->
+    <div style="margin-top: 10px;">
+      <label style="font-size: 13px; color: var(--muted);">Filtrar por Chapter Tags</label>
+      <div style="margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 120px; overflow-y: auto; background: white;">
+        {#if availableChapterTags.length === 0}
+          <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma tag disponível</p>
+        {:else}
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            {#each availableChapterTags as tag}
+              <label style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); background: {fChapterTags.includes(tag._id) ? '#f5f3ff' : 'white'}; cursor: pointer; font-size: 13px;">
+                <input
+                  type="checkbox"
+                  value={tag._id}
+                  checked={fChapterTags.includes(tag._id)}
+                  on:change={(e) => {
+                    if (e.target.checked) {
+                      fChapterTags = [...fChapterTags, tag._id];
+                    } else {
+                      fChapterTags = fChapterTags.filter(id => id !== tag._id);
+                    }
+                  }}
+                  style="margin: 0;"
+                />
+                <span>{tag.name}</span>
+              </label>
+            {/each}
+          </div>
+        {/if}
+      </div>
     </div>
 
     <div style="margin-top: 10px; color: var(--muted); font-size: 13px;">
@@ -206,7 +310,12 @@
                 <span style={badgeStyle("type", q.type)}>{typeLabel(q.type)}</span>
                 <span style={badgeStyle("status", q.status)}>{q.status}</span>
                 <span style={badgeStyle("source", q.source)}>{q.source}</span>
-                <span style={badgeStyle("difficulty", q.difficulty)}>D {q.difficulty}/4</span>
+                <span style={badgeStyle("difficulty", q.difficulty)}>{difficultyLabel(q.difficulty)}</span>
+                {#if q.usageCount > 0}
+                  <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid var(--border); background:#fef3c7; border-color:#fde047;">
+                    Usada {q.usageCount}x
+                  </span>
+                {/if}
               </div>
 
               <div style="display:flex; gap: 8px;">
@@ -253,6 +362,28 @@
                 {#each q.tags as t}
                   <span style="display:inline-flex; padding:3px 8px; border-radius:999px; font-size:12px; border:1px solid var(--border); background:#fff;">
                     #{t}
+                  </span>
+                {/each}
+              </div>
+            {/if}
+
+            <!-- Labels -->
+            {#if (q.labels || []).length > 0}
+              <div style="margin-top: 10px; display:flex; gap:6px; flex-wrap: wrap;">
+                {#each q.labels as label}
+                  <span style="display:inline-flex; padding:3px 8px; border-radius:999px; font-size:12px; border:1px solid #a5f3fc; background:#ecfeff; color:#155e75;">
+                    📝 {typeof label === 'string' ? label : label.name}
+                  </span>
+                {/each}
+              </div>
+            {/if}
+
+            <!-- Chapter Tags -->
+            {#if (q.chapterTags || []).length > 0}
+              <div style="margin-top: 10px; display:flex; gap:6px; flex-wrap: wrap;">
+                {#each q.chapterTags as tag}
+                  <span style="display:inline-flex; padding:3px 8px; border-radius:999px; font-size:12px; border:1px solid #c4b5fd; background:#f5f3ff; color:#6b21a8;">
+                    📚 {typeof tag === 'string' ? tag : tag.name}
                   </span>
                 {/each}
               </div>

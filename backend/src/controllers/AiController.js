@@ -152,11 +152,20 @@ export async function generateQuestionsHandler(req, res) {
     let savedQuestions = [];
     if (saveToBank && bank) {
       for (const q of result.questions) {
+        // Usa chapter tags e labels gerados pela IA, ou os fornecidos pelo utilizador como fallback
         const finalChapterTags = Array.isArray(q.chapterTags) && q.chapterTags.length > 0 ? q.chapterTags : chapterTags;
         const finalLabels = Array.isArray(q.labels) && q.labels.length > 0 ? q.labels : labels;
 
+        console.log(`[AI] Processando chapter tags para questão:`, finalChapterTags);
+        console.log(`[AI] Processando labels para questão:`, finalLabels);
+
+        // Converte nomes de chapter tags em IDs (cria se não existirem)
         const chapterTagIds = await upsertChapterTags(finalChapterTags);
+        // Converte nomes de labels em IDs (cria se não existirem)
         const labelIds = await upsertLabels(finalLabels);
+
+        console.log(`[AI] Chapter tag IDs criados/encontrados:`, chapterTagIds);
+        console.log(`[AI] Label IDs criados/encontrados:`, labelIds);
 
         const question = await Question.create({
           bank: bank._id,
@@ -208,6 +217,24 @@ export async function generateQuestionsHandler(req, res) {
     res.status(500).json({
       error: err.message || "Erro ao gerar questões",
     });
+  }
+}
+
+/**
+ * GET /ai/generations
+ * Lista todas as gerações do utilizador
+ */
+export async function listGenerationsHandler(req, res) {
+  try {
+    const generations = await AiGeneration.find({ user: req.userId })
+      .populate("bank", "title")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json(generations);
+  } catch (err) {
+    console.error("Erro em listGenerationsHandler:", err);
+    res.status(500).json({ error: "Erro ao listar gerações" });
   }
 }
 

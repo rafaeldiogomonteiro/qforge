@@ -1,5 +1,6 @@
 <script>
   import { page } from "$app/stores";
+  import { logout } from "$lib/stores/auth";
   
   const menuItems = [
     { href: "/app", label: "Dashboard", icon: "📊" },
@@ -42,12 +43,14 @@
     {/each}
   </nav>
 
+  
   <div class="sidebar-footer">
+    <button class="logout-btn" on:click={logout}>Terminar sessão</button>
     <div class="user-info">
       <div class="user-avatar">👤</div>
       <div class="user-details">
         <div class="user-name">Utilizador</div>
-        <div class="user-role">Admin</div>
+        <div class="user-role">Docente</div>
       </div>
     </div>
   </div>
@@ -134,6 +137,8 @@
   .sidebar-footer {
     padding: 16px;
     border-top: 1px solid #e5e7eb;
+    display: grid;
+    gap: 12px;
   }
 
   .user-info {
@@ -167,8 +172,26 @@
     white-space: nowrap;
   }
 
+  .logout-btn {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    background: #fff7ed;
+    color: #c2410c;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  
+  .logout-btn:hover {
+    background: #ffedd5;
+    border-color: #fdba74;
+  }
+  
   .user-role {
     font-size: 12px;
     color: #6b7280;
   }
+
 </style>

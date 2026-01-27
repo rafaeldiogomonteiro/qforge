@@ -28,19 +28,21 @@
   }
 </script>
 
+<div class="auth-wrapper">
 <div
   style="
     max-width: 420px;
-    margin: 40px auto;
+    width: 100%;
     background: white;
     border: 1px solid var(--border);
     border-radius: 14px;
     padding: 20px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.08);
   "
 >
   <h2 style="margin: 0;">Entrar</h2>
   <p style="margin: 6px 0 18px; color: var(--muted);">
-    Autenticação via JWT.
+    Cria questões de forma rápida e fácil.
   </p>
 
   <form on:submit|preventDefault={submit} style="display: grid; gap: 12px;">
@@ -108,3 +110,25 @@
     </a>
   </div>
 </div>
+</div>
+
+<style>
+  :global(body) {
+    background:
+      linear-gradient(
+      rgba(0, 0, 0, 0.4),
+      rgba(0, 0, 0, 0.4)
+    ),
+      url("https://blog.unis.edu.br/hubfs/shutterstock_318001037.jpg");
+    background-size: cover;
+    background-position: center;
+  }
+
+  .auth-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+</style>

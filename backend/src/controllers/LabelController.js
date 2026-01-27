@@ -13,7 +13,10 @@ export async function listLabels(req, res) {
   try {
     const includeInactive = String(req.query.includeInactive || "").toLowerCase() === "1";
 
-    const filter = includeInactive ? {} : { isActive: true };
+    const filter = {
+      owner: req.userId,
+      ...(includeInactive ? {} : { isActive: true }),
+    };
 
     const labels = await Label.find(filter)
       .sort({ name: 1 })
@@ -39,20 +42,24 @@ export async function createLabel(req, res) {
 
     const normalizedName = normalizeKey(cleanName);
 
-    const label = await Label.findOneAndUpdate(
-      { normalizedName },
-      { $setOnInsert: { name: cleanName, normalizedName, isActive: true } },
-      { new: true, upsert: true }
-    );
-
-    // Se já existia mas estava inativa, reativa
-    if (label && label.isActive === false) {
-      label.isActive = true;
-      await label.save();
+    const existing = await Label.findOne({ owner: req.userId, normalizedName });
+    if (existing) {
+      if (existing.isActive === false) {
+        existing.isActive = true;
+        await existing.save();
+        return res.status(200).json(existing);
+      }
+      return res.status(409).json({ error: "Essa Label já existe" });
     }
 
-    // Não é trivial saber se foi insert sem rawResult; devolvemos 200/201? Mantemos 200.
-    return res.status(200).json(label);
+    const label = await Label.create({
+      name: cleanName,
+      normalizedName,
+      isActive: true,
+      owner: req.userId,
+    });
+
+    return res.status(201).json(label);
   } catch (err) {
     if (err?.code === 11000) {
       return res.status(409).json({ error: "Já existe uma label com esse nome" });
@@ -68,7 +75,7 @@ export async function updateLabel(req, res) {
     const { id } = req.params;
     const { name, isActive } = req.body || {};
 
-    const label = await Label.findById(id);
+    const label = await Label.findOne({ _id: id, owner: req.userId });
     if (!label) {
       return res.status(404).json({ error: "Label não encontrada" });
     }
@@ -102,7 +109,7 @@ export async function deleteLabel(req, res) {
   try {
     const { id } = req.params;
 
-    const label = await Label.findById(id);
+    const label = await Label.findOne({ _id: id, owner: req.userId });
     if (!label) {
       return res.status(404).json({ error: "Label não encontrada" });
     }

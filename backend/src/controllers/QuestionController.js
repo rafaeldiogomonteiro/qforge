@@ -15,15 +15,22 @@ function looksLikeObjectId(value) {
   return typeof value === "string" && mongoose.Types.ObjectId.isValid(value);
 }
 
-async function upsertLabelsFromNames(names) {
+async function upsertLabelsFromNames(names, ownerId) {
   const cleaned = [...new Set(normalizeStringArray(names))];
   const ids = [];
 
   for (const name of cleaned) {
     const normalizedName = name.toLowerCase();
     const label = await Label.findOneAndUpdate(
-      { normalizedName },
-      { $setOnInsert: { name, normalizedName, isActive: true } },
+      { owner: ownerId, normalizedName },
+      {
+        $setOnInsert: {
+          name,
+          normalizedName,
+          isActive: true,
+          owner: ownerId,
+        },
+      },
       { new: true, upsert: true }
     );
     if (label.isActive === false) {
@@ -36,15 +43,22 @@ async function upsertLabelsFromNames(names) {
   return ids;
 }
 
-async function upsertChapterTagsFromNames(names) {
+async function upsertChapterTagsFromNames(names, ownerId) {
   const cleaned = [...new Set(normalizeStringArray(names))];
   const ids = [];
 
   for (const name of cleaned) {
     const normalizedName = name.toLowerCase();
     const tag = await ChapterTag.findOneAndUpdate(
-      { normalizedName },
-      { $setOnInsert: { name, normalizedName, isActive: true } },
+      { owner: ownerId, normalizedName },
+      {
+        $setOnInsert: {
+          name,
+          normalizedName,
+          isActive: true,
+          owner: ownerId,
+        },
+      },
       { new: true, upsert: true }
     );
     if (tag.isActive === false) {
@@ -115,21 +129,39 @@ export async function createQuestion(req, res) {
     let chapterTagIds = [];
     if (chapterTags !== undefined) {
       if (Array.isArray(chapterTags) && chapterTags.every(looksLikeObjectId)) {
-        chapterTagIds = chapterTags;
+        const allowedTags = await ChapterTag.find({
+          _id: { $in: chapterTags },
+          owner: req.userId,
+        }).select("_id");
+        if (allowedTags.length !== chapterTags.length) {
+          return res
+            .status(400)
+            .json({ error: "Algumas chapter tags não existem ou não pertencem ao utilizador" });
+        }
+        chapterTagIds = allowedTags.map((t) => t._id);
       } else {
-        chapterTagIds = await upsertChapterTagsFromNames(chapterTags);
+        chapterTagIds = await upsertChapterTagsFromNames(chapterTags, req.userId);
       }
     } else if (tags !== undefined) {
       // Compatibilidade: tags (strings) -> chapterTags
-      chapterTagIds = await upsertChapterTagsFromNames(tags);
+      chapterTagIds = await upsertChapterTagsFromNames(tags, req.userId);
     }
 
     let labelIds = [];
     if (labels !== undefined) {
       if (Array.isArray(labels) && labels.every(looksLikeObjectId)) {
-        labelIds = labels;
+        const allowedLabels = await Label.find({
+          _id: { $in: labels },
+          owner: req.userId,
+        }).select("_id");
+        if (allowedLabels.length !== labels.length) {
+          return res
+            .status(400)
+            .json({ error: "Algumas labels não existem ou não pertencem ao utilizador" });
+        }
+        labelIds = allowedLabels.map((l) => l._id);
       } else {
-        labelIds = await upsertLabelsFromNames(labels);
+        labelIds = await upsertLabelsFromNames(labels, req.userId);
       }
     }
 
@@ -263,22 +295,40 @@ export async function updateQuestion(req, res) {
 
     if (labels !== undefined) {
       if (Array.isArray(labels) && labels.every(looksLikeObjectId)) {
-        question.labels = labels;
+        const allowedLabels = await Label.find({
+          _id: { $in: labels },
+          owner: req.userId,
+        }).select("_id");
+        if (allowedLabels.length !== labels.length) {
+          return res
+            .status(400)
+            .json({ error: "Algumas labels não existem ou não pertencem ao utilizador" });
+        }
+        question.labels = allowedLabels.map((l) => l._id);
       } else {
-        question.labels = await upsertLabelsFromNames(labels);
+        question.labels = await upsertLabelsFromNames(labels, req.userId);
       }
     }
 
     // chapterTags aceita ids ou nomes; tags (legacy) aceita nomes
     if (chapterTags !== undefined) {
       if (Array.isArray(chapterTags) && chapterTags.every(looksLikeObjectId)) {
-        question.chapterTags = chapterTags;
+        const allowedTags = await ChapterTag.find({
+          _id: { $in: chapterTags },
+          owner: req.userId,
+        }).select("_id");
+        if (allowedTags.length !== chapterTags.length) {
+          return res
+            .status(400)
+            .json({ error: "Algumas chapter tags não existem ou não pertencem ao utilizador" });
+        }
+        question.chapterTags = allowedTags.map((t) => t._id);
       } else {
-        question.chapterTags = await upsertChapterTagsFromNames(chapterTags);
+        question.chapterTags = await upsertChapterTagsFromNames(chapterTags, req.userId);
       }
       question.tags = await namesFromChapterTagIds(question.chapterTags);
     } else if (tags !== undefined) {
-      question.chapterTags = await upsertChapterTagsFromNames(tags);
+      question.chapterTags = await upsertChapterTagsFromNames(tags, req.userId);
       question.tags = await namesFromChapterTagIds(question.chapterTags);
     }
     if (source !== undefined) question.source = source;

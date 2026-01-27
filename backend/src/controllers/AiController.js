@@ -160,9 +160,9 @@ export async function generateQuestionsHandler(req, res) {
         console.log(`[AI] Processando labels para questão:`, finalLabels);
 
         // Converte nomes de chapter tags em IDs (cria se não existirem)
-        const chapterTagIds = await upsertChapterTags(finalChapterTags);
+        const chapterTagIds = await upsertChapterTags(finalChapterTags, req.userId);
         // Converte nomes de labels em IDs (cria se não existirem)
-        const labelIds = await upsertLabels(finalLabels);
+        const labelIds = await upsertLabels(finalLabels, req.userId);
 
         console.log(`[AI] Chapter tag IDs criados/encontrados:`, chapterTagIds);
         console.log(`[AI] Label IDs criados/encontrados:`, labelIds);
@@ -327,8 +327,8 @@ export async function approveGenerationHandler(req, res) {
       const finalLabels = Array.isArray(merged.labels) ? merged.labels : [];
       const finalChapterTags = Array.isArray(merged.chapterTags) ? merged.chapterTags : [];
 
-      const labelIds = await upsertLabels(finalLabels);
-      const chapterTagIds = await upsertChapterTags(finalChapterTags);
+      const labelIds = await upsertLabels(finalLabels, req.userId);
+      const chapterTagIds = await upsertChapterTags(finalChapterTags, req.userId);
 
       const question = await Question.create({
         bank: bank._id,
@@ -559,15 +559,22 @@ export async function getConfigHandler(req, res) {
 }
 
 // Helpers para upsert de tags e labels
-async function upsertChapterTags(names) {
+async function upsertChapterTags(names, ownerId) {
   if (!Array.isArray(names) || names.length === 0) return [];
 
   const ids = [];
   for (const name of names) {
     const normalizedName = String(name).trim().toLowerCase();
     const tag = await ChapterTag.findOneAndUpdate(
-      { normalizedName },
-      { $setOnInsert: { name: String(name).trim(), normalizedName, isActive: true } },
+      { owner: ownerId, normalizedName },
+      {
+        $setOnInsert: {
+          name: String(name).trim(),
+          normalizedName,
+          isActive: true,
+          owner: ownerId,
+        },
+      },
       { new: true, upsert: true }
     );
     if (tag && tag.isActive === false) {
@@ -579,15 +586,22 @@ async function upsertChapterTags(names) {
   return ids;
 }
 
-async function upsertLabels(names) {
+async function upsertLabels(names, ownerId) {
   if (!Array.isArray(names) || names.length === 0) return [];
 
   const ids = [];
   for (const name of names) {
     const normalizedName = String(name).trim().toLowerCase();
     const label = await Label.findOneAndUpdate(
-      { normalizedName },
-      { $setOnInsert: { name: String(name).trim(), normalizedName, isActive: true } },
+      { owner: ownerId, normalizedName },
+      {
+        $setOnInsert: {
+          name: String(name).trim(),
+          normalizedName,
+          isActive: true,
+          owner: ownerId,
+        },
+      },
       { new: true, upsert: true }
     );
     if (label && label.isActive === false) {

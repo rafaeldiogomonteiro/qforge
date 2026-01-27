@@ -19,6 +19,8 @@ import labelRoutes from "./routes/labelRoutes.js";
 import chapterTagRoutes from "./routes/chapterTagRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import User from "./models/User.js";
+import Label from "./models/Label.js";
+import ChapterTag from "./models/ChapterTag.js";
 
 const app = express();
 
@@ -52,6 +54,9 @@ async function start() {
 
     // Migração simples: role "COORDENADOR" foi removido -> passa a "DOCENTE"
     await User.updateMany({ role: "COORDENADOR" }, { $set: { role: "DOCENTE" } });
+
+    // Garante que os índices refletem o esquema atual (inclui índices por owner em labels e chapterTags)
+    await Promise.all([Label.syncIndexes(), ChapterTag.syncIndexes()]);
 
     app.listen(PORT, () => {
       console.log(`🚀 Server a correr em http://localhost:${PORT}`);

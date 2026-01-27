@@ -15,6 +15,24 @@ function looksLikeObjectId(value) {
   return typeof value === "string" && mongoose.Types.ObjectId.isValid(value);
 }
 
+function splitIdsAndNames(arr) {
+  const ids = new Set();
+  const names = new Set();
+
+  (arr || []).forEach((item) => {
+    if (looksLikeObjectId(item)) {
+      ids.add(String(item));
+    } else if (typeof item === "string" && item.trim()) {
+      names.add(item.trim());
+    }
+  });
+
+  return {
+    ids: Array.from(ids),
+    names: Array.from(names),
+  };
+}
+
 async function upsertLabelsFromNames(names, ownerId) {
   const cleaned = [...new Set(normalizeStringArray(names))];
   const ids = [];
@@ -128,40 +146,51 @@ export async function createQuestion(req, res) {
 
     let chapterTagIds = [];
     if (chapterTags !== undefined) {
-      if (Array.isArray(chapterTags) && chapterTags.every(looksLikeObjectId)) {
+      const { ids: providedIds, names: providedNames } = splitIdsAndNames(chapterTags);
+
+      if (providedIds.length) {
         const allowedTags = await ChapterTag.find({
-          _id: { $in: chapterTags },
+          _id: { $in: providedIds },
           owner: req.userId,
         }).select("_id");
-        if (allowedTags.length !== chapterTags.length) {
+        if (allowedTags.length !== providedIds.length) {
           return res
             .status(400)
             .json({ error: "Algumas chapter tags não existem ou não pertencem ao utilizador" });
         }
-        chapterTagIds = allowedTags.map((t) => t._id);
-      } else {
-        chapterTagIds = await upsertChapterTagsFromNames(chapterTags, req.userId);
+        chapterTagIds.push(...allowedTags.map((t) => t._id));
+      }
+
+      if (providedNames.length) {
+        const created = await upsertChapterTagsFromNames(providedNames, req.userId);
+        chapterTagIds.push(...created);
       }
     } else if (tags !== undefined) {
       // Compatibilidade: tags (strings) -> chapterTags
-      chapterTagIds = await upsertChapterTagsFromNames(tags, req.userId);
+      const { names: providedNames } = splitIdsAndNames(tags);
+      chapterTagIds = await upsertChapterTagsFromNames(providedNames, req.userId);
     }
 
     let labelIds = [];
     if (labels !== undefined) {
-      if (Array.isArray(labels) && labels.every(looksLikeObjectId)) {
+      const { ids: providedIds, names: providedNames } = splitIdsAndNames(labels);
+
+      if (providedIds.length) {
         const allowedLabels = await Label.find({
-          _id: { $in: labels },
+          _id: { $in: providedIds },
           owner: req.userId,
         }).select("_id");
-        if (allowedLabels.length !== labels.length) {
+        if (allowedLabels.length !== providedIds.length) {
           return res
             .status(400)
             .json({ error: "Algumas labels não existem ou não pertencem ao utilizador" });
         }
-        labelIds = allowedLabels.map((l) => l._id);
-      } else {
-        labelIds = await upsertLabelsFromNames(labels, req.userId);
+        labelIds.push(...allowedLabels.map((l) => l._id));
+      }
+
+      if (providedNames.length) {
+        const created = await upsertLabelsFromNames(providedNames, req.userId);
+        labelIds.push(...created);
       }
     }
 

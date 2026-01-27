@@ -167,9 +167,8 @@
     try {
       // Criar cada questão no banco
       for (const q of generated) {
-        await api.post("/questions", {
-          ...q,
-          bankId: selectedBankForSave
+        await api.post(`/banks/${selectedBankForSave}/questions`, {
+          ...q
         });
       }
       

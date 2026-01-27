@@ -9,6 +9,7 @@
 
   let apiKey = "";
   let hasExistingConfig = false;
+  let usingEnvKey = false;
   let models = [];
 
   const AVAILABLE_MODELS = [
@@ -26,11 +27,10 @@
       // Check if there's an existing Groq config
       const { data } = await api.get("/ai/config");
       
-      if (data && data.provider === "groq") {
-        hasExistingConfig = true;
-        // API key won't be sent back for security, so we show placeholder
-        apiKey = ""; // User needs to enter new key to update
-      }
+      hasExistingConfig = Boolean(data?.hasConfig);
+      usingEnvKey = Boolean(data?.usingEnvKey);
+      // API key is never returned for security; leave blank
+      apiKey = "";
 
       // Load available models
       try {
@@ -101,7 +101,11 @@
     <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px;">
       <h3 style="margin: 0 0 16px 0;">API Key do Groq</h3>
 
-      {#if hasExistingConfig}
+      {#if usingEnvKey}
+        <div style="background: #ecfdf5; border: 1px solid #bbf7d0; border-radius: 10px; padding: 12px; margin-bottom: 16px; color: #166534; font-size: 14px;">
+          ✓ A API key já está configurada pelo administrador no servidor. Não precisas inserir nada aqui.
+        </div>
+      {:else if hasExistingConfig}
         <div style="background: #ecfdf5; border: 1px solid #bbf7d0; border-radius: 10px; padding: 12px; margin-bottom: 16px; color: #166534; font-size: 14px;">
           ✓ Já existe uma configuração guardada. Insere uma nova API key para atualizar.
         </div>
@@ -116,12 +120,14 @@
             bind:value={apiKey}
             type="password"
             placeholder="gsk_..."
-            disabled={saving}
+            disabled={saving || usingEnvKey}
             style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 10px; font-family: ui-monospace, monospace;"
           />
-          <p style="margin: 6px 0 0; color: var(--muted); font-size: 12px;">
-            Obtém a tua API key em <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">console.groq.com/keys</a>
-          </p>
+          {#if !usingEnvKey}
+            <p style="margin: 6px 0 0; color: var(--muted); font-size: 12px;">
+              Obtém a tua API key em <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">console.groq.com/keys</a>
+            </p>
+          {/if}
         </div>
 
         {#if error}
@@ -136,7 +142,7 @@
           </div>
         {/if}
 
-        <button type="submit" class="btn" disabled={saving}>
+        <button type="submit" class="btn" disabled={saving || usingEnvKey}>
           {saving ? "A guardar..." : "Guardar Configuração"}
         </button>
       </form>

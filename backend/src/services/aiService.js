@@ -4,6 +4,7 @@
  */
 
 const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
+const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 // Modelos disponíveis no Groq (gratuitos)
 export const GROQ_MODELS = {
@@ -28,20 +29,37 @@ const QUESTION_TYPE_LABELS = {
 };
 
 /**
- * Faz chamada à API Groq
+ * Faz chamada à API de chat (Groq ou OpenRouter, ambas compatíveis com formato OpenAI)
  */
-async function callGroqAPI(apiKey, model, messages, temperature = 0.7) {
-  const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
+async function callChatAPI(
+  provider,
+  model,
+  messages,
+  temperature = 0.7,
+  maxTokens = 4096
+  ) {
+  const baseURL =
+    provider?.baseURL ||
+    (provider?.name === "openrouter" ? OPENROUTER_BASE_URL : GROQ_BASE_URL);
+
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${provider?.apiKey}`,
+    ...(provider?.headers || {}),
+  };
+
+  if (!provider?.apiKey) {
+    throw new Error("API key de IA não configurada");
+  }
+
+  const response = await fetch(`${baseURL}/chat/completions`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers,
     body: JSON.stringify({
       model,
       messages,
       temperature,
-      max_tokens: 4096,
+      max_tokens: maxTokens,
       response_format: { type: "json_object" },
     }),
   });
@@ -49,12 +67,14 @@ async function callGroqAPI(apiKey, model, messages, temperature = 0.7) {
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(
-      error.error?.message || `Groq API error: ${response.status}`
+      error.error?.message ||
+        error.message ||
+        `AI provider error: ${response.status}`
     );
   }
 
   const data = await response.json();
-  return data.choices[0]?.message?.content || "";
+  return data.choices?.[0]?.message?.content || "";
 }
 
 /**
@@ -160,9 +180,9 @@ function buildUserPrompt(params) {
 /**
  * Gera questões usando IA
  */
-export async function generateQuestions(apiKey, params) {
+export async function generateQuestions(provider, params) {
   const {
-    model = GROQ_MODELS.LLAMA_3_3_70B,
+    model = provider?.model || GROQ_MODELS.LLAMA_3_3_70B,
     language = "pt-PT",
     topic,
     content,
@@ -193,7 +213,7 @@ export async function generateQuestions(apiKey, params) {
     },
   ];
 
-  const responseText = await callGroqAPI(apiKey, model, messages);
+  const responseText = await callChatAPI(provider, model, messages);
 
   // Parse JSON response
   let parsed;
@@ -257,8 +277,8 @@ export async function generateQuestions(apiKey, params) {
 /**
  * Melhora uma questão existente
  */
-export async function improveQuestion(apiKey, question, instructions = "") {
-  const model = GROQ_MODELS.LLAMA_3_3_70B;
+export async function improveQuestion(provider, question, instructions = "") {
+  const model = provider?.model || GROQ_MODELS.LLAMA_3_3_70B;
 
   const systemPrompt = `És um especialista em melhorar questões educativas.
 Recebe uma questão e melhora-a seguindo as instruções.
@@ -288,7 +308,7 @@ Responde APENAS com JSON.`;
     { role: "user", content: userPrompt },
   ];
 
-  const responseText = await callGroqAPI(apiKey, model, messages);
+  const responseText = await callChatAPI(provider, model, messages);
 
   let parsed;
   try {
@@ -309,12 +329,16 @@ Responde APENAS com JSON.`;
  * Gera distratores para uma questão de escolha múltipla
  */
 export async function generateDistractors(
-  apiKey,
+  provider,
   stem,
   correctAnswer,
   numDistractors = 3
 ) {
-  const model = GROQ_MODELS.LLAMA_3_1_8B; // Modelo mais rápido para tarefa simples
+  // Se houver modelo rápido definido no provider, usa-o para poupar custos/latência
+  const model =
+    provider?.distractorModel ||
+    provider?.model ||
+    GROQ_MODELS.LLAMA_3_1_8B; // Modelo mais rápido para tarefa simples
 
   const systemPrompt = `Gera distratores (opções erradas mas plausíveis) para questões de escolha múltipla.
 Os distratores devem parecer credíveis mas estar claramente errados.
@@ -330,7 +354,7 @@ Gera ${numDistractors} distratores plausíveis. Responde APENAS com JSON.`;
     { role: "user", content: userPrompt },
   ];
 
-  const responseText = await callGroqAPI(apiKey, model, messages, 0.8);
+  const responseText = await callChatAPI(provider, model, messages, 0.8);
 
   let parsed;
   try {

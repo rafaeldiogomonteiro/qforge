@@ -138,12 +138,15 @@
       generated = data?.questions || [];
       
       console.log('Questões geradas:', generated);
-    } catch (e) {
-      error = e?.response?.data?.message || "Erro ao gerar questões com IA.";
-    } finally {
-      generating = false;
-    }
+  } catch (e) {
+    error =
+      e?.response?.data?.error ||
+      e?.response?.data?.message ||
+      "Erro ao gerar questões com IA.";
+  } finally {
+    generating = false;
   }
+}
   
   function openSaveToBankModal() {
     selectedBankForSave = bankId || "";
@@ -661,4 +664,3 @@
     background: #f3f4f6;
   }
 </style>
-

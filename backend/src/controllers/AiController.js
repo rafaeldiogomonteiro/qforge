@@ -9,23 +9,43 @@ import QuestionBank from "../models/QuestionBank.js";
 import ChapterTag from "../models/ChapterTag.js";
 import Label from "../models/Label.js";
 
-/**
- * Obtém a API key do Groq (sempre do servidor)
- */
-async function getGroqProvider() {
-  const apiKey = process.env.GROQ_API_KEY;
-  return {
-    apiKey: apiKey || null,
-    model: GROQ_MODELS.LLAMA_3_3_70B,
-  };
-}
+const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+const OPENROUTER_DEFAULT_MODEL =
+  process.env.OPENROUTER_MODEL || "arcee-ai/trinity-large-preview:free";
+const OPENROUTER_FAST_MODEL =
+  process.env.OPENROUTER_FAST_MODEL ||
+  "liquid/lfm-2.5-1.2b-instruct:free";
 
 /**
- * Helper simples para obter só a apiKey (usado em improve/distractors)
+ * Obtém o provedor de IA (Groq por defeito, senão OpenRouter como fallback)
  */
-async function getGroqApiKey() {
-  const provider = await getGroqProvider();
-  return provider.apiKey;
+function getAiProvider({ preferFastModel = false } = {}) {
+  if (process.env.GROQ_API_KEY) {
+    return {
+      name: "groq",
+      apiKey: process.env.GROQ_API_KEY,
+      model: preferFastModel
+        ? GROQ_MODELS.LLAMA_3_1_8B
+        : GROQ_MODELS.LLAMA_3_3_70B,
+      baseURL: "https://api.groq.com/openai/v1",
+    };
+  }
+
+  if (process.env.OPENROUTER_API_KEY) {
+    return {
+      name: "openrouter",
+      apiKey: process.env.OPENROUTER_API_KEY,
+      model: preferFastModel ? OPENROUTER_FAST_MODEL : OPENROUTER_DEFAULT_MODEL,
+      baseURL: OPENROUTER_BASE_URL,
+      headers: {
+        // OpenRouter recomenda enviar estas headers
+        "HTTP-Referer": process.env.OPENROUTER_SITE || "http://localhost:5173",
+        "X-Title": process.env.OPENROUTER_TITLE || "QForge",
+      },
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -55,10 +75,11 @@ export async function generateQuestionsHandler(req, res) {
         .json({ error: "É necessário fornecer 'topic' ou 'content'" });
     }
 
-    const provider = await getGroqProvider();
-    if (!provider.apiKey) {
+    const provider = getAiProvider();
+    if (!provider?.apiKey) {
       return res.status(500).json({
-        error: "API key do Groq não configurada no servidor. Contacta o administrador.",
+        error:
+          "Nenhum provedor de IA está configurado. Define GROQ_API_KEY ou OPENROUTER_API_KEY no servidor.",
       });
     }
 
@@ -77,7 +98,7 @@ export async function generateQuestionsHandler(req, res) {
     }
 
     // Gera questões
-    const result = await generateQuestions(provider.apiKey, {
+    const result = await generateQuestions(provider, {
       model: provider.model,
       topic,
       content,
@@ -172,12 +193,14 @@ export async function improveQuestionHandler(req, res) {
         .json({ error: "É necessário fornecer 'question' ou 'questionId'" });
     }
 
-    const apiKey = await getGroqApiKey();
-    if (!apiKey) {
-      return res.status(400).json({ error: "API key do Groq não configurada" });
+    const provider = getAiProvider();
+    if (!provider?.apiKey) {
+      return res
+        .status(400)
+        .json({ error: "API key de IA não configurada" });
     }
 
-    const result = await improveQuestion(apiKey, targetQuestion, instructions);
+    const result = await improveQuestion(provider, targetQuestion, instructions);
 
     res.json({
       success: true,
@@ -205,13 +228,15 @@ export async function generateDistractorsHandler(req, res) {
         .json({ error: "'stem' e 'correctAnswer' são obrigatórios" });
     }
 
-    const apiKey = await getGroqApiKey();
-    if (!apiKey) {
-      return res.status(400).json({ error: "API key do Groq não configurada" });
+    const provider = getAiProvider({ preferFastModel: true });
+    if (!provider?.apiKey) {
+      return res
+        .status(400)
+        .json({ error: "API key de IA não configurada" });
     }
 
     const distractors = await generateDistractors(
-      apiKey,
+      provider,
       stem,
       correctAnswer,
       numDistractors

@@ -2,6 +2,26 @@
  * Serviço de IA para geração de questões
  * Suporta Groq API (compatível com formato OpenAI)
  */
+import { Agent, fetch as undiciFetch } from "undici";
+
+// Dispatcher dedicado para chamadas de IA com timeouts mais generosos
+const AI_CONNECT_TIMEOUT_MS = Number(process.env.AI_CONNECT_TIMEOUT_MS) || 10_000;
+const AI_HEADERS_TIMEOUT_MS = Number(process.env.AI_HEADERS_TIMEOUT_MS) || 90_000;
+const AI_BODY_TIMEOUT_MS = Number(process.env.AI_BODY_TIMEOUT_MS) || 240_000;
+const AI_REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS) || 240_000;
+const AI_REQUEST_RETRIES = Number(process.env.AI_REQUEST_RETRIES ?? 1); // nº de tentativas extra
+const AI_RETRY_DELAY_MS = Number(process.env.AI_RETRY_DELAY_MS) || 1_500;
+
+const aiDispatcher = new Agent({
+  connect: { timeout: AI_CONNECT_TIMEOUT_MS },
+  headersTimeout: AI_HEADERS_TIMEOUT_MS,
+  bodyTimeout: AI_BODY_TIMEOUT_MS,
+});
+
+// Fecha o dispatcher ao terminar o processo para evitar handles pendentes
+process.on("exit", () => aiDispatcher.close());
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
@@ -52,29 +72,72 @@ async function callChatAPI(
     throw new Error("API key de IA não configurada");
   }
 
-  const response = await fetch(`${baseURL}/chat/completions`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model,
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-      response_format: { type: "json_object" },
-    }),
-  });
+  const url = `${baseURL}/chat/completions`;
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(
-      error.error?.message ||
-        error.message ||
-        `AI provider error: ${response.status}`
+  const makeRequest = async (attempt) => {
+    const controller = new AbortController();
+    const requestTimeout = setTimeout(
+      () => controller.abort(new Error("AI request timeout")),
+      AI_REQUEST_TIMEOUT_MS
     );
-  }
 
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content || "";
+    try {
+      const response = await undiciFetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature,
+          max_tokens: maxTokens,
+          response_format: { type: "json_object" },
+        }),
+        dispatcher: aiDispatcher,
+        headersTimeout: AI_HEADERS_TIMEOUT_MS,
+        bodyTimeout: AI_BODY_TIMEOUT_MS,
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(
+          error.error?.message ||
+            error.message ||
+            `AI provider error: ${response.status}`
+        );
+      }
+
+      const data = await response.json();
+      return data.choices?.[0]?.message?.content || "";
+    } catch (err) {
+      const isTimeout =
+        err?.name === "AbortError" ||
+        err?.code === "UND_ERR_HEADERS_TIMEOUT" ||
+        err?.code === "UND_ERR_BODY_TIMEOUT";
+
+      const isNetwork =
+        err?.code === "UND_ERR_CONNECT_TIMEOUT" ||
+        err?.code === "UND_ERR_SOCKET" ||
+        err?.code === "UND_ERR_REQUEST_ABORTED";
+
+      const retriable = isTimeout || isNetwork;
+
+      if (retriable && attempt < AI_REQUEST_RETRIES) {
+        await sleep(AI_RETRY_DELAY_MS);
+        return makeRequest(attempt + 1);
+      }
+
+      // propaga com mensagem mais amigável
+      const reason = isTimeout
+        ? "Tempo limite excedido ao contactar o provedor de IA. Tenta novamente."
+        : err.message || "Erro ao contactar o provedor de IA";
+      throw new Error(reason);
+    } finally {
+      clearTimeout(requestTimeout);
+    }
+  };
+
+  return makeRequest(0);
 }
 
 /**

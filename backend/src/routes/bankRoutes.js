@@ -6,7 +6,6 @@ import {
   getBankById,
   updateBank,
   deleteBank,
-  updateBankStatus,
   exportBank,
 } from "../controllers/QuestionBankController.js";
 
@@ -19,7 +18,6 @@ router.get("/", listMyBanks);
 router.post("/", createBank);
 router.get("/:id", getBankById);
 router.put("/:id", updateBank);
-router.patch("/:id/status", updateBankStatus); // <-- NOVA ROTA
 router.delete("/:id", deleteBank);
 
 // Exportação: /banks/:id/export?format=gift|aiken|moodle

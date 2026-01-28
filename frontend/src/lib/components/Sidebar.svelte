@@ -1,18 +1,18 @@
 <script>
   import { page } from "$app/stores";
   import { logout } from "$lib/stores/auth";
+  import { currentUser } from "$lib/stores/user";
   
   const menuItems = [
     { href: "/app", label: "Dashboard", icon: "📊" },
     { href: "/app/banks", label: "Bancos de Questões", icon: "🗂️" },
     { href: "/app/generate", label: "Gerar com IA", icon: "🤖" },
-    { href: "/app/generations", label: "Gerações IA", icon: "📝" },
     { href: "/app/labels", label: "Labels", icon: "🏷️" },
-    { href: "/app/chapter-tags", label: "Chapter Tags", icon: "📚" },
-    { href: "/app/settings", label: "Configurações", icon: "⚙️" }
+    { href: "/app/chapter-tags", label: "Chapter Tags", icon: "📚" }
   ];
 
   $: currentPath = $page.url.pathname;
+  $: userName = $currentUser?.name || "Utilizador";
   
   function isActive(href) {
     if (href === "/app") {
@@ -45,14 +45,14 @@
 
   
   <div class="sidebar-footer">
-    <button class="logout-btn" on:click={logout}>Terminar sessão</button>
-    <div class="user-info">
+    <a href="/app/profile" class="profile-link" class:active={currentPath === "/app/profile"}>
       <div class="user-avatar">👤</div>
       <div class="user-details">
-        <div class="user-name">Utilizador</div>
-        <div class="user-role">Docente</div>
+        <div class="user-name">{userName}</div>
+        <div class="user-hint">Ver perfil</div>
       </div>
-    </div>
+    </a>
+    <button class="logout-btn" on:click={logout}>Terminar sessão</button>
   </div>
 </aside>
 
@@ -141,10 +141,25 @@
     gap: 12px;
   }
 
-  .user-info {
+  .profile-link {
     display: flex;
     align-items: center;
     gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.15s;
+    border: 1px solid transparent;
+  }
+
+  .profile-link:hover {
+    background: #f3f4f6;
+  }
+
+  .profile-link.active {
+    background: #eff6ff;
+    border-color: #bfdbfe;
   }
 
   .user-avatar {
@@ -172,6 +187,11 @@
     white-space: nowrap;
   }
 
+  .user-hint {
+    font-size: 12px;
+    color: #6b7280;
+  }
+
   .logout-btn {
     width: 100%;
     padding: 10px 12px;
@@ -188,10 +208,6 @@
     background: #ffedd5;
     border-color: #fdba74;
   }
-  
-  .user-role {
-    font-size: 12px;
-    color: #6b7280;
-  }
+
 
 </style>

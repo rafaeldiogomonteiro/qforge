@@ -1,34 +1,5 @@
 import QuestionBank from "../models/QuestionBank.js";
-import User from "../models/User.js";
 import Question from "../models/Question.js";
-
-function canSetOfficialOrArchived(role) {
-  // "COORDENADOR" foi removido; "DOCENTE" herda essas permissões
-  return role === "DOCENTE" || role === "ADMIN";
-}
-
-function isValidStatusTransition(from, to) {
-  if (from === to) return true;
-
-  if (from === "DRAFT") {
-    return ["IN_REVIEW", "ARCHIVED"].includes(to);
-  }
-
-  if (from === "IN_REVIEW") {
-    return ["DRAFT", "OFFICIAL", "ARCHIVED"].includes(to);
-  }
-
-  if (from === "OFFICIAL") {
-    return ["ARCHIVED"].includes(to);
-  }
-
-  if (from === "ARCHIVED") {
-    // banco arquivado não pode voltar atrás
-    return false;
-  }
-
-  return false;
-}
 
 // POST /banks
 export async function createBank(req, res) {
@@ -63,7 +34,6 @@ export async function listMyBanks(req, res) {
     const {
       page = 1,
       limit = 10,
-      status,
       tags,
       academicYear,
       search,
@@ -73,10 +43,6 @@ export async function listMyBanks(req, res) {
     const limitNum = Math.max(parseInt(limit, 10) || 10, 1);
 
     const filter = { owner: req.userId };
-
-    if (status) {
-      filter.status = status;
-    }
 
     if (academicYear) {
       filter.academicYear = academicYear;
@@ -155,7 +121,6 @@ export async function updateBank(req, res) {
       discipline,
       academicYear,
       tags,
-      status,
     } = req.body;
 
     const bank = await QuestionBank.findById(id);
@@ -176,13 +141,6 @@ export async function updateBank(req, res) {
     if (discipline !== undefined) bank.discipline = discipline;
     if (academicYear !== undefined) bank.academicYear = academicYear;
     if (tags !== undefined) bank.tags = tags;
-
-    // status é tratado numa rota própria (updateBankStatus)
-    if (status !== undefined) {
-      console.warn(
-        "Ignorado status em updateBank, usar rota PATCH /banks/:id/status"
-      );
-    }
 
     await bank.save();
 
@@ -215,77 +173,6 @@ export async function deleteBank(req, res) {
     res.json({ message: "Banco apagado com sucesso" });
   } catch (err) {
     console.error("Erro em deleteBank:", err);
-    res.status(500).json({ error: "Erro no servidor" });
-  }
-}
-
-// PATCH /banks/:id/status
-export async function updateBankStatus(req, res) {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    const validStatuses = ["DRAFT", "IN_REVIEW", "OFFICIAL", "ARCHIVED"];
-
-    if (!status) {
-      return res.status(400).json({ error: "status é obrigatório" });
-    }
-
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ error: "status inválido" });
-    }
-
-    const bank = await QuestionBank.findById(id);
-    if (!bank) {
-      return res.status(404).json({ error: "Banco não encontrado" });
-    }
-
-    const user = await User.findById(req.userId);
-    if (!user) {
-      return res.status(401).json({ error: "Utilizador não encontrado" });
-    }
-
-    const from = bank.status;
-    const to = status;
-
-    if (!isValidStatusTransition(from, to)) {
-      return res.status(400).json({
-        error: `Transição de estado inválida: ${from} -> ${to}`,
-      });
-    }
-
-    // OFFICIAL / ARCHIVED: DOCENTE (antigo COORDENADOR) ou ADMIN
-    if ((to === "OFFICIAL" || to === "ARCHIVED") && !canSetOfficialOrArchived(user.role)) {
-      return res.status(403).json({
-        error:
-          "Apenas DOCENTE ou ADMIN podem definir estado OFFICIAL ou ARCHIVED",
-      });
-    }
-
-    // DRAFT / IN_REVIEW: owner ou DOCENTE/ADMIN
-    if (
-      (to === "DRAFT" || to === "IN_REVIEW") &&
-      String(bank.owner) !== String(req.userId) &&
-      !canSetOfficialOrArchived(user.role)
-    ) {
-      return res.status(403).json({
-        error:
-          "Apenas o dono do banco (ou DOCENTE/ADMIN) pode alterar este estado",
-      });
-    }
-
-    bank.status = to;
-
-    // Quando sobe a OFFICIAL, aumenta versão
-    if (to === "OFFICIAL") {
-      bank.version = (bank.version || 1) + 1;
-    }
-
-    await bank.save();
-
-    res.json(bank);
-  } catch (err) {
-    console.error("Erro em updateBankStatus:", err);
     res.status(500).json({ error: "Erro no servidor" });
   }
 }

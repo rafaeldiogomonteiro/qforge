@@ -37,7 +37,6 @@
   let selectedLabels = []; // array of label IDs
   let selectedChapterTags = []; // array of chapter tag IDs
   let acceptableAnswersText = "";
-  let status = "DRAFT";
   let source = "MANUAL";
 
   let options = [];
@@ -112,7 +111,6 @@
     type = q.type;
     stem = q.stem || "";
     difficulty = q.difficulty ?? 2;
-    status = q.status || "DRAFT";
     source = q.source || "MANUAL";
 
     tagsText = (q.tags || []).join(", ");
@@ -173,7 +171,6 @@
         tags: parseTags(),
         labels: selectedLabels,
         chapterTags: selectedChapterTags,
-        status,
         source
       };
 
@@ -254,16 +251,7 @@
         </div>
       </div>
 
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-        <div>
-          <label style="font-size: 14px;">Status</label>
-          <select bind:value={status} style="width: 100%; margin-top: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 10px;">
-            <option value="DRAFT">DRAFT</option>
-            <option value="IN_REVIEW">IN_REVIEW</option>
-            <option value="APPROVED">APPROVED</option>
-          </select>
-        </div>
-
+      <div style="display:grid; grid-template-columns: 1fr; gap: 12px;">
         <div>
           <label style="font-size: 14px;">Origem</label>
           <select bind:value={source} style="width: 100%; margin-top: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 10px;">

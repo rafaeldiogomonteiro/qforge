@@ -239,94 +239,218 @@
 
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
         <div>
-          <label style="font-size: 13px; color: var(--muted);">Tipos</label>
-          <select
-            multiple
-            size="4"
-            bind:value={types}
-            style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
-          >
-            <option value="MULTIPLE_CHOICE">MULTIPLE_CHOICE</option>
-            <option value="TRUE_FALSE">TRUE_FALSE</option>
-            <option value="SHORT_ANSWER">SHORT_ANSWER</option>
-            <option value="OPEN">OPEN</option>
-          </select>
-          <p style="margin:6px 0 0; font-size:12px; color: var(--muted);">
-            Ctrl/Cmd para selecionar múltiplos.
-          </p>
+          <label style="font-size: 13px; color: var(--muted); margin-bottom: 6px; display: block;">Tipos de Questões</label>
+          <div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: white;">
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+              <input
+                type="checkbox"
+                value="MULTIPLE_CHOICE"
+                checked={types.includes("MULTIPLE_CHOICE")}
+                on:change={(e) => {
+                  if (e.target.checked) {
+                    types = [...types, "MULTIPLE_CHOICE"];
+                  } else {
+                    types = types.filter(t => t !== "MULTIPLE_CHOICE");
+                  }
+                }}
+                style="width: 16px; height: 16px;"
+              />
+              <span style="font-size: 14px;">📝 Escolha múltipla</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+              <input
+                type="checkbox"
+                value="TRUE_FALSE"
+                checked={types.includes("TRUE_FALSE")}
+                on:change={(e) => {
+                  if (e.target.checked) {
+                    types = [...types, "TRUE_FALSE"];
+                  } else {
+                    types = types.filter(t => t !== "TRUE_FALSE");
+                  }
+                }}
+                style="width: 16px; height: 16px;"
+              />
+              <span style="font-size: 14px;">✓✗ Verdadeiro/Falso</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+              <input
+                type="checkbox"
+                value="SHORT_ANSWER"
+                checked={types.includes("SHORT_ANSWER")}
+                on:change={(e) => {
+                  if (e.target.checked) {
+                    types = [...types, "SHORT_ANSWER"];
+                  } else {
+                    types = types.filter(t => t !== "SHORT_ANSWER");
+                  }
+                }}
+                style="width: 16px; height: 16px;"
+              />
+              <span style="font-size: 14px;">✍️ Resposta curta</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input
+                type="checkbox"
+                value="OPEN"
+                checked={types.includes("OPEN")}
+                on:change={(e) => {
+                  if (e.target.checked) {
+                    types = [...types, "OPEN"];
+                  } else {
+                    types = types.filter(t => t !== "OPEN");
+                  }
+                }}
+                style="width: 16px; height: 16px;"
+              />
+              <span style="font-size: 14px;">📄 Aberta</span>
+            </label>
+          </div>
         </div>
 
         <div>
-          <label style="font-size: 13px; color: var(--muted);">Dificuldades</label>
-          <select
-            multiple
-            size="4"
-            bind:value={difficulties}
-            style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
-          >
-            <option value={1}>1 - Básico</option>
-            <option value={2}>2 - Normal</option>
-            <option value={3}>3 - Difícil</option>
-            <option value={4}>4 - Muito Difícil</option>
-          </select>
-          <p style="margin:6px 0 0; font-size:12px; color: var(--muted);">
-            Ctrl/Cmd para selecionar múltiplos.
-          </p>
+          <label style="font-size: 13px; color: var(--muted); margin-bottom: 6px; display: block;">Níveis de Dificuldade</label>
+          <div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: white;">
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+              <input
+                type="checkbox"
+                value={1}
+                checked={difficulties.includes(1)}
+                on:change={(e) => {
+                  if (e.target.checked) {
+                    difficulties = [...difficulties, 1];
+                  } else {
+                    difficulties = difficulties.filter(d => d !== 1);
+                  }
+                }}
+                style="width: 16px; height: 16px;"
+              />
+              <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #ecfeff; border: 1px solid #a5f3fc;">1 - Básico</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+              <input
+                type="checkbox"
+                value={2}
+                checked={difficulties.includes(2)}
+                on:change={(e) => {
+                  if (e.target.checked) {
+                    difficulties = [...difficulties, 2];
+                  } else {
+                    difficulties = difficulties.filter(d => d !== 2);
+                  }
+                }}
+                style="width: 16px; height: 16px;"
+              />
+              <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #f0fdf4; border: 1px solid #bbf7d0;">2 - Normal</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+              <input
+                type="checkbox"
+                value={3}
+                checked={difficulties.includes(3)}
+                on:change={(e) => {
+                  if (e.target.checked) {
+                    difficulties = [...difficulties, 3];
+                  } else {
+                    difficulties = difficulties.filter(d => d !== 3);
+                  }
+                }}
+                style="width: 16px; height: 16px;"
+              />
+              <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #fffbeb; border: 1px solid #fde68a;">3 - Difícil</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input
+                type="checkbox"
+                value={4}
+                checked={difficulties.includes(4)}
+                on:change={(e) => {
+                  if (e.target.checked) {
+                    difficulties = [...difficulties, 4];
+                  } else {
+                    difficulties = difficulties.filter(d => d !== 4);
+                  }
+                }}
+                style="width: 16px; height: 16px;"
+              />
+              <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #fef2f2; border: 1px solid #fecaca;">4 - Muito Difícil</span>
+            </label>
+          </div>
         </div>
       </div>
 
       <!-- Labels -->
       <div>
-        <label style="font-size: 13px; color: var(--muted);">Labels (opcional)</label>
-        <div style="margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 150px; overflow-y: auto;">
+        <label style="font-size: 13px; color: var(--muted); margin-bottom: 6px; display: block;">
+          Labels (opcional)
+          {#if selectedLabels.length > 0}
+            <span style="color: #1d4ed8; font-weight: 500;"> - {selectedLabels.length} selecionada(s)</span>
+          {/if}
+        </label>
+        <div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px; max-height: 180px; overflow-y: auto; background: white;">
           {#if availableLabels.length === 0}
-            <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma label disponível. <a href="/app/labels">Criar labels</a></p>
+            <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma label disponível. <a href="/app/labels" style="color: #1d4ed8;">Criar labels</a></p>
           {:else}
-            {#each availableLabels as label}
-              <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer;">
-                <input
-                  type="checkbox"
-                  value={label._id}
-                  checked={selectedLabels.includes(label._id)}
-                  on:change={(e) => {
-                    if (e.target.checked) {
-                      selectedLabels = [...selectedLabels, label._id];
-                    } else {
-                      selectedLabels = selectedLabels.filter(id => id !== label._id);
-                    }
-                  }}
-                />
-                <span style="font-size: 14px;">{label.name}</span>
-              </label>
-            {/each}
+            <div style="display: grid; gap: 8px;">
+              {#each availableLabels as label}
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px; border-radius: 8px; transition: background 0.2s;" class="checkbox-hover">
+                  <input
+                    type="checkbox"
+                    value={label._id}
+                    checked={selectedLabels.includes(label._id)}
+                    on:change={(e) => {
+                      if (e.target.checked) {
+                        selectedLabels = [...selectedLabels, label._id];
+                      } else {
+                        selectedLabels = selectedLabels.filter(id => id !== label._id);
+                      }
+                    }}
+                    style="width: 16px; height: 16px;"
+                  />
+                  <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #ecfeff; border: 1px solid #a5f3fc;">
+                    📝 {label.name}
+                  </span>
+                </label>
+              {/each}
+            </div>
           {/if}
         </div>
       </div>
 
       <!-- Chapter Tags -->
       <div>
-        <label style="font-size: 13px; color: var(--muted);">Chapter Tags (opcional)</label>
-        <div style="margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 150px; overflow-y: auto;">
+        <label style="font-size: 13px; color: var(--muted); margin-bottom: 6px; display: block;">
+          Chapter Tags (opcional)
+          {#if selectedChapterTags.length > 0}
+            <span style="color: #7c3aed; font-weight: 500;"> - {selectedChapterTags.length} selecionada(s)</span>
+          {/if}
+        </label>
+        <div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px; max-height: 180px; overflow-y: auto; background: white;">
           {#if availableChapterTags.length === 0}
-            <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma tag disponível. <a href="/app/chapter-tags">Criar tags</a></p>
+            <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma tag disponível. <a href="/app/chapter-tags" style="color: #7c3aed;">Criar tags</a></p>
           {:else}
-            {#each availableChapterTags as tag}
-              <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer;">
-                <input
-                  type="checkbox"
-                  value={tag._id}
-                  checked={selectedChapterTags.includes(tag._id)}
-                  on:change={(e) => {
-                    if (e.target.checked) {
-                      selectedChapterTags = [...selectedChapterTags, tag._id];
-                    } else {
-                      selectedChapterTags = selectedChapterTags.filter(id => id !== tag._id);
-                    }
-                  }}
-                />
-                <span style="font-size: 14px;">{tag.name}</span>
-              </label>
-            {/each}
+            <div style="display: grid; gap: 8px;">
+              {#each availableChapterTags as tag}
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px; border-radius: 8px; transition: background 0.2s;" class="checkbox-hover">
+                  <input
+                    type="checkbox"
+                    value={tag._id}
+                    checked={selectedChapterTags.includes(tag._id)}
+                    on:change={(e) => {
+                      if (e.target.checked) {
+                        selectedChapterTags = [...selectedChapterTags, tag._id];
+                      } else {
+                        selectedChapterTags = selectedChapterTags.filter(id => id !== tag._id);
+                      }
+                    }}
+                    style="width: 16px; height: 16px;"
+                  />
+                  <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #f5f3ff; border: 1px solid #c4b5fd;">
+                    📚 {tag.name}
+                  </span>
+                </label>
+              {/each}
+            </div>
           {/if}
         </div>
       </div>
@@ -531,6 +655,10 @@
       opacity: 1;
       transform: scale(1);
     }
+  }
+
+  .checkbox-hover:hover {
+    background: #f3f4f6;
   }
 </style>
 

@@ -6,7 +6,6 @@
   let stats = {
     totalQuestions: 0,
     totalBanks: 0,
-    pendingGenerations: 0,
     totalLabels: 0,
     totalChapterTags: 0,
     difficultyDistribution: { 1: 0, 2: 0, 3: 0, 4: 0 },
@@ -33,22 +32,19 @@
     loading = true;
     
     try {
-      const [banksRes, labelsRes, tagsRes, generationsRes] = await Promise.all([
+      const [banksRes, labelsRes, tagsRes] = await Promise.all([
         api.get("/banks"),
         api.get("/labels"),
-        api.get("/chapter-tags"),
-        api.get("/ai/generations").catch(() => ({ data: [] }))
+        api.get("/chapter-tags")
       ]);
 
       const banks = banksRes.data?.data || [];
       const labels = labelsRes.data || [];
       const tags = tagsRes.data || [];
-      const generations = Array.isArray(generationsRes.data) ? generationsRes.data : [];
 
       stats.totalBanks = banks.length;
       stats.totalLabels = labels.length;
       stats.totalChapterTags = tags.length;
-      stats.pendingGenerations = generations.filter(g => g.status === "PENDING").length;
 
       // Load all questions from all banks
       let allQuestions = [];
@@ -104,11 +100,6 @@
       <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
         <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Bancos</div>
         <div style="font-size: 32px; font-weight: 600; color: #059669;">{stats.totalBanks}</div>
-      </div>
-
-      <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
-        <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Gerações Pendentes</div>
-        <div style="font-size: 32px; font-weight: 600; color: #dc2626;">{stats.pendingGenerations}</div>
       </div>
 
       <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
@@ -192,24 +183,6 @@
           <div>
             <div style="font-weight: 500;">Gerar com IA</div>
             <div style="font-size: 12px; color: var(--muted);">Criar questões automaticamente</div>
-          </div>
-        </a>
-
-        {#if stats.pendingGenerations > 0}
-          <a href="/app/generations" class="action-btn" style="background: #fef3c7; border-color: #fde047;">
-            <span style="font-size: 24px;">📝</span>
-            <div>
-              <div style="font-weight: 500;">Rever Gerações</div>
-              <div style="font-size: 12px; color: var(--muted);">{stats.pendingGenerations} pendentes</div>
-            </div>
-          </a>
-        {/if}
-
-        <a href="/app/settings" class="action-btn">
-          <span style="font-size: 24px;">⚙️</span>
-          <div>
-            <div style="font-weight: 500;">Configurações</div>
-            <div style="font-size: 12px; color: var(--muted);">API e preferências</div>
           </div>
         </a>
       </div>

@@ -9,10 +9,6 @@
   let password = "";
   let confirmPassword = "";
 
-  // role opcional: se não enviares, backend mete DOCENTE
-  let role = "DOCENTE";
-  let includeRole = false;
-
   let loading = false;
   let error = "";
 
@@ -42,12 +38,9 @@
         password
       };
 
-      // só envia role se o utilizador quiser escolher (senão fica default do backend)
-      if (includeRole) payload.role = role;
-
       const { data } = await api.post("/auth/register", payload);
 
-      // resposta: { message, token, user { id, name, email, role } }
+      // resposta: { message, token, user { id, name, email } }
       authToken.set(data.token);
       if (data.user) currentUser.set(data.user);
 
@@ -123,33 +116,6 @@
         placeholder="••••••••"
         style="width: 100%; margin-top: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 10px;"
       />
-    </div>
-
-    <!-- Role opcional -->
-    <div style="border: 1px solid var(--border); border-radius: 12px; padding: 12px;">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap: 10px;">
-        <div>
-          <div style="font-weight: 600;">Role (opcional)</div>
-          <div style="margin-top: 4px; color: var(--muted); font-size: 13px;">
-            Se não escolheres, o backend assume <b>DOCENTE</b>.
-          </div>
-        </div>
-
-        <label style="display:flex; align-items:center; gap: 8px; font-size: 14px;">
-          <input type="checkbox" bind:checked={includeRole} />
-          Escolher role
-        </label>
-      </div>
-
-      {#if includeRole}
-        <select
-          bind:value={role}
-          style="width: 100%; margin-top: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 10px;"
-        >
-          <option value="DOCENTE">DOCENTE</option>
-          <option value="ADMIN">ADMIN</option>
-        </select>
-      {/if}
     </div>
 
     {#if error}

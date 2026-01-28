@@ -13,9 +13,13 @@
   let availableLabels = [];
   let availableChapterTags = [];
 
+  // Export modal
+  let showExportModal = false;
+  let exportLoading = false;
+  let exportError = "";
+
   // filtros
   let fType = "ALL";
-  let fStatus = "ALL";
   let fSource = "ALL";
   let fDifficulty = "ALL";
   let fLabels = []; // Array of selected label IDs
@@ -52,6 +56,51 @@
     }
   }
 
+  async function exportBank(format) {
+    exportLoading = true;
+    exportError = "";
+
+    try {
+      const response = await api.get(`/banks/${bank._id}/export?format=${format}`, {
+        responseType: 'blob'
+      });
+
+      // Determinar extensão e tipo de ficheiro
+      const extensions = {
+        gift: '.gift',
+        aiken: '.txt',
+        moodle: '.xml'
+      };
+
+      const mimeTypes = {
+        gift: 'text/plain',
+        aiken: 'text/plain',
+        moodle: 'application/xml'
+      };
+
+      // Criar blob e fazer download
+      const blob = new Blob([response.data], { type: mimeTypes[format] });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      const filename = (bank.title || 'banco').replace(/[^a-zA-Z0-9_-]/g, '_');
+      link.download = `${filename}${extensions[format]}`;
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      showExportModal = false;
+    } catch (e) {
+      console.error("Erro ao exportar:", e);
+      exportError = e?.response?.data?.error || "Erro ao exportar banco.";
+    } finally {
+      exportLoading = false;
+    }
+  }
+
   function typeLabel(type) {
     return {
       MULTIPLE_CHOICE: "Escolha múltipla",
@@ -64,15 +113,6 @@
   function badgeStyle(kind, value) {
     // estilos simples e consistentes
     const base = "display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid var(--border); background:#fff;";
-
-    if (kind === "status") {
-      const map = {
-        DRAFT: "background:#fff7ed; border-color:#fed7aa;",
-        IN_REVIEW: "background:#eff6ff; border-color:#bfdbfe;",
-        APPROVED: "background:#ecfdf5; border-color:#bbf7d0;"
-      };
-      return base + (map[value] || "");
-    }
 
     if (kind === "source") {
       const map = {
@@ -121,7 +161,6 @@
 
   $: filtered = questions.filter((q) => {
     if (fType !== "ALL" && q.type !== fType) return false;
-    if (fStatus !== "ALL" && q.status !== fStatus) return false;
     if (fSource !== "ALL" && q.source !== fSource) return false;
     if (fDifficulty !== "ALL" && String(q.difficulty) !== fDifficulty) return false;
 
@@ -166,11 +205,97 @@
       {bank.discipline} • {bank.academicYear} • {bank.language}
     </div>
 
-    <div style="margin-top: 14px; display: flex; gap: 10px;">
+    <div style="margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
       <a class="btn" href={`/app/banks/${bank._id}/questions/new`}>+ Nova questão</a>
+      <button class="btn btn-secondary" on:click={() => showExportModal = true} disabled={questions.length === 0}>
+        📤 Exportar
+      </button>
       <a class="btn" href="/app/banks">Voltar aos bancos</a>
     </div>
   </div>
+
+  <!-- Modal de Exportação -->
+  {#if showExportModal}
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+      <div style="background: white; border-radius: 14px; padding: 24px; width: 100%; max-width: 420px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Exportar Banco</h3>
+          <button 
+            on:click={() => showExportModal = false} 
+            style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--muted);"
+          >×</button>
+        </div>
+
+        <p style="margin: 0 0 16px 0; color: var(--muted); font-size: 14px;">
+          Seleciona o formato de exportação para o banco <strong>{bank.title}</strong> ({questions.length} questões).
+        </p>
+
+        {#if exportError}
+          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 12px; margin-bottom: 16px; color: #b91c1c; font-size: 14px;">
+            {exportError}
+          </div>
+        {/if}
+
+        <div style="display: grid; gap: 12px;">
+          <button 
+            class="export-option"
+            on:click={() => exportBank('gift')}
+            disabled={exportLoading}
+          >
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 24px;">📝</span>
+              <div style="text-align: left;">
+                <div style="font-weight: 600;">GIFT Format</div>
+                <div style="font-size: 13px; color: var(--muted);">Formato nativo do Moodle para importação rápida</div>
+              </div>
+            </div>
+          </button>
+
+          <button 
+            class="export-option"
+            on:click={() => exportBank('aiken')}
+            disabled={exportLoading}
+          >
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 24px;">📋</span>
+              <div style="text-align: left;">
+                <div style="font-weight: 600;">Aiken Format</div>
+                <div style="font-size: 13px; color: var(--muted);">Formato simples para escolha múltipla (.txt)</div>
+              </div>
+            </div>
+          </button>
+
+          <button 
+            class="export-option"
+            on:click={() => exportBank('moodle')}
+            disabled={exportLoading}
+          >
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 24px;">🎓</span>
+              <div style="text-align: left;">
+                <div style="font-weight: 600;">Moodle XML</div>
+                <div style="font-size: 13px; color: var(--muted);">Formato XML completo com todos os metadados</div>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        {#if exportLoading}
+          <div style="margin-top: 16px; text-align: center; color: var(--muted); font-size: 14px;">
+            A exportar...
+          </div>
+        {/if}
+
+        <button 
+          class="btn" 
+          style="width: 100%; margin-top: 16px; background: #f3f4f6; color: #374151;"
+          on:click={() => showExportModal = false}
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  {/if}
 
   <!-- Filtros -->
   <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 16px;">
@@ -183,16 +308,6 @@
           <option value="TRUE_FALSE">V/F</option>
           <option value="SHORT_ANSWER">Resposta curta</option>
           <option value="OPEN">Aberta</option>
-        </select>
-      </div>
-
-      <div>
-        <label style="font-size: 13px; color: var(--muted);">Status</label>
-        <select bind:value={fStatus} style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;">
-          <option value="ALL">Todos</option>
-          <option value="DRAFT">DRAFT</option>
-          <option value="IN_REVIEW">IN_REVIEW</option>
-          <option value="APPROVED">APPROVED</option>
         </select>
       </div>
 
@@ -308,7 +423,6 @@
             <div style="display:flex; justify-content:space-between; gap: 12px; align-items:flex-start;">
               <div style="display:flex; gap: 8px; flex-wrap: wrap;">
                 <span style={badgeStyle("type", q.type)}>{typeLabel(q.type)}</span>
-                <span style={badgeStyle("status", q.status)}>{q.status}</span>
                 <span style={badgeStyle("source", q.source)}>{q.source}</span>
                 <span style={badgeStyle("difficulty", q.difficulty)}>{difficultyLabel(q.difficulty)}</span>
                 {#if q.usageCount > 0}
@@ -398,3 +512,59 @@
     {/if}
   </div>
 {/if}
+
+<style>
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 18px;
+    background: #1d4ed8;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.2s;
+  }
+
+  .btn:hover {
+    background: #1e40af;
+  }
+
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    background: #059669;
+  }
+
+  .btn-secondary:hover {
+    background: #047857;
+  }
+
+  .export-option {
+    width: 100%;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+  }
+
+  .export-option:hover {
+    border-color: #1d4ed8;
+    background: #eff6ff;
+  }
+
+  .export-option:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+</style>

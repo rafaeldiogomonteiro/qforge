@@ -60,12 +60,6 @@ const questionSchema = new mongoose.Schema(
       default: "MANUAL",
     },
 
-    status: {
-      type: String,
-      enum: ["DRAFT", "IN_REVIEW", "APPROVED"],
-      default: "DRAFT",
-    },
-
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

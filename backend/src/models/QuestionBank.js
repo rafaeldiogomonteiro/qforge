@@ -21,25 +21,14 @@ const questionBankSchema = new mongoose.Schema(
       },
     ],
 
+    tags: [{ type: String }],
+
     coordinators: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
-
-    tags: [{ type: String }],
-
-    status: {
-      type: String,
-      enum: ["DRAFT", "IN_REVIEW", "OFFICIAL", "ARCHIVED"],
-      default: "DRAFT",
-    },
-
-    version: {
-      type: Number,
-      default: 1,
-    },
   },
   { timestamps: true }
 );

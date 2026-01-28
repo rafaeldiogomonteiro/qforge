@@ -121,7 +121,6 @@ export async function createQuestion(req, res) {
       chapterTags,
       labels,
       source,
-      status,
     } = req.body;
 
     const bank = await QuestionBank.findById(bankId);
@@ -208,7 +207,6 @@ export async function createQuestion(req, res) {
       chapterTags: chapterTagIds,
       labels: labelIds,
       source: source || "MANUAL",
-      status: status || "DRAFT",
       createdBy: req.userId,
     });
 
@@ -294,7 +292,6 @@ export async function updateQuestion(req, res) {
       chapterTags,
       labels,
       source,
-      status,
     } = req.body;
 
     const question = await Question.findById(id).populate("bank");
@@ -361,7 +358,6 @@ export async function updateQuestion(req, res) {
       question.tags = await namesFromChapterTagIds(question.chapterTags);
     }
     if (source !== undefined) question.source = source;
-    if (status !== undefined) question.status = status;
 
     await question.save();
 

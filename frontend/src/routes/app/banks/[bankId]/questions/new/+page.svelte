@@ -151,7 +151,6 @@
         labels: selectedLabels,
         chapterTags: selectedChapterTags,
         source: "MANUAL",
-        status: "DRAFT"
       };
 
       if (type === "MULTIPLE_CHOICE" || type === "TRUE_FALSE") {
@@ -368,7 +367,7 @@
 
     <div style="display:flex; gap: 10px; margin-top: 4px;">
       <button class="btn" type="submit" disabled={loading} style="padding: 10px 14px;">
-        {loading ? "A guardar..." : "Guardar (DRAFT)"}
+        {loading ? "A guardar..." : "Guardar"}
       </button>
 
       <a

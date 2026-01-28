@@ -52,9 +52,6 @@ async function start() {
   try {
     await connectDB();
 
-    // Migração simples: role "COORDENADOR" foi removido -> passa a "DOCENTE"
-    await User.updateMany({ role: "COORDENADOR" }, { $set: { role: "DOCENTE" } });
-
     // Garante que os índices refletem o esquema atual (inclui índices por owner em labels e chapterTags)
     await Promise.all([Label.syncIndexes(), ChapterTag.syncIndexes()]);
 

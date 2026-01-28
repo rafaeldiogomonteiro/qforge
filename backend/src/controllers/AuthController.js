@@ -11,7 +11,7 @@ function generateToken(userId) {
 // POST /auth/register
 export async function register(req, res) {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
       return res
@@ -28,16 +28,10 @@ export async function register(req, res) {
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const allowedRoles = ["DOCENTE", "ADMIN"];
-    if (role !== undefined && role !== null && role !== "" && !allowedRoles.includes(role)) {
-      return res.status(400).json({ error: "role inválido" });
-    }
-
     const user = await User.create({
       name,
       email,
       passwordHash,
-      role: role || "DOCENTE",
     });
 
     const token = generateToken(user._id);
@@ -49,7 +43,6 @@ export async function register(req, res) {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
       },
     });
   } catch (err) {
@@ -88,7 +81,6 @@ export async function login(req, res) {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
       },
     });
   } catch (err) {
@@ -107,6 +99,115 @@ export async function getMe(req, res) {
     res.json(user);
   } catch (err) {
     console.error("Erro no getMe:", err);
+    res.status(500).json({ error: "Erro no servidor" });
+  }
+}
+
+// PUT /auth/profile - Atualizar informações do perfil
+export async function updateProfile(req, res) {
+  try {
+    const { name, email, institution, department } = req.body;
+
+    // Validações básicas
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: "O nome é obrigatório" });
+    }
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({ error: "O email é obrigatório" });
+    }
+
+    // Verificar se o email já está em uso por outro utilizador
+    const existingUser = await User.findOne({ 
+      email: email.trim(), 
+      _id: { $ne: req.userId } 
+    });
+    
+    if (existingUser) {
+      return res.status(409).json({ error: "Este email já está em uso" });
+    }
+
+    // Atualizar o utilizador
+    const updatedUser = await User.findByIdAndUpdate(
+      req.userId,
+      {
+        name: name.trim(),
+        email: email.trim(),
+        institution: institution?.trim() || null,
+        department: department?.trim() || null,
+      },
+      { new: true }
+    ).select("-passwordHash");
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: "Utilizador não encontrado" });
+    }
+
+    res.json({
+      message: "Perfil atualizado com sucesso",
+      user: updatedUser,
+    });
+  } catch (err) {
+    console.error("Erro no updateProfile:", err);
+    res.status(500).json({ error: "Erro no servidor" });
+  }
+}
+
+// PUT /auth/password - Alterar palavra-passe
+export async function changePassword(req, res) {
+  try {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+
+    // Validações
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({ 
+        error: "Todos os campos são obrigatórios" 
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ 
+        error: "A nova password deve ter pelo menos 6 caracteres" 
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ 
+        error: "A nova password e a confirmação não coincidem" 
+      });
+    }
+
+    // Buscar utilizador com a passwordHash
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: "Utilizador não encontrado" });
+    }
+
+    // Verificar password atual
+    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ error: "Password atual incorreta" });
+    }
+
+    // Verificar se a nova password é igual à atual
+    const isSamePassword = await bcrypt.compare(newPassword, user.passwordHash);
+    if (isSamePassword) {
+      return res.status(400).json({ 
+        error: "A nova password não pode ser igual à password atual" 
+      });
+    }
+
+    // Hash da nova password
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    // Atualizar password
+    await User.findByIdAndUpdate(req.userId, { 
+      passwordHash: newPasswordHash 
+    });
+
+    res.json({ message: "Password alterada com sucesso" });
+  } catch (err) {
+    console.error("Erro no changePassword:", err);
     res.status(500).json({ error: "Erro no servidor" });
   }
 }

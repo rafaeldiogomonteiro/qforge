@@ -27,7 +27,11 @@ export const swaggerSpec = {
           id: { type: "string" },
           name: { type: "string" },
           email: { type: "string" },
-          role: { type: "string", enum: ["DOCENTE", "ADMIN"] },
+          institution: { type: "string" },
+          department: { type: "string" },
+          isActive: { type: "boolean" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
         },
       },
       AuthRegisterRequest: {
@@ -37,11 +41,6 @@ export const swaggerSpec = {
           name: { type: "string", example: "Rafael Monteiro" },
           email: { type: "string", example: "rafael@example.com" },
           password: { type: "string", example: "123456" },
-          role: {
-            type: "string",
-            enum: ["DOCENTE", "ADMIN"],
-            example: "DOCENTE",
-          },
         },
       },
       AuthLoginRequest: {
@@ -73,10 +72,6 @@ export const swaggerSpec = {
             type: "array",
             items: { type: "string" },
             example: ["POO", "frequência"],
-          },
-          status: {
-            type: "string",
-            enum: ["DRAFT", "IN_REVIEW", "OFFICIAL", "ARCHIVED"],
           },
         },
       },
@@ -124,10 +119,6 @@ export const swaggerSpec = {
           tags: { type: "array", items: { type: "string" } },
           labels: { type: "array", items: { type: "string" } },
           chapterTags: { type: "array", items: { type: "string" } },
-          status: {
-            type: "string",
-            enum: ["DRAFT", "IN_REVIEW", "APPROVED"],
-          },
         },
       },
       CreateQuestionRequest: {
@@ -249,9 +240,79 @@ export const swaggerSpec = {
         },
       },
     },
+    "/auth/profile": {
+      put: {
+        summary: "Atualizar perfil do utilizador",
+        tags: ["Autenticação"],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["name", "email"],
+                properties: {
+                  name: { type: "string", example: "João Silva" },
+                  email: { type: "string", example: "joao@exemplo.pt" },
+                  institution: { type: "string", example: "Universidade do Minho" },
+                  department: { type: "string", example: "Informática" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Perfil atualizado com sucesso",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: { type: "string" },
+                    user: { $ref: "#/components/schemas/User" },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: "Dados inválidos" },
+          409: { description: "Email já em uso" },
+        },
+      },
+    },
+    "/auth/password": {
+      put: {
+        summary: "Alterar palavra-passe",
+        tags: ["Autenticação"],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["currentPassword", "newPassword", "confirmPassword"],
+                properties: {
+                  currentPassword: { type: "string", example: "senha_atual" },
+                  newPassword: { type: "string", example: "nova_senha" },
+                  confirmPassword: { type: "string", example: "nova_senha" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: { description: "Password alterada com sucesso" },
+          400: { description: "Dados inválidos" },
+          401: { description: "Password atual incorreta" },
+        },
+      },
+    },
     "/banks": {
       get: {
-        summary: "Listar bancos de questões do utilizador autenticado",
+        summary: "Listar bancos de questões",
         tags: ["Bancos de Questões"],
         security: [{ bearerAuth: [] }],
         responses: {
@@ -266,11 +327,10 @@ export const swaggerSpec = {
               },
             },
           },
-          401: { description: "Token inválido" },
         },
       },
       post: {
-        summary: "Criar novo banco de questões",
+        summary: "Criar banco de questões",
         tags: ["Bancos de Questões"],
         security: [{ bearerAuth: [] }],
         requestBody: {
@@ -359,44 +419,6 @@ export const swaggerSpec = {
         ],
         responses: {
           200: { description: "Banco apagado" },
-          403: { description: "Sem permissão" },
-          404: { description: "Banco não encontrado" },
-        },
-      },
-    },
-    "/banks/{id}/status": {
-      patch: {
-        summary: "Atualizar estado do banco",
-        tags: ["Bancos de Questões"],
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            name: "id",
-            in: "path",
-            required: true,
-            schema: { type: "string" },
-          },
-        ],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                required: ["status"],
-                properties: {
-                  status: {
-                    type: "string",
-                    enum: ["DRAFT", "IN_REVIEW", "OFFICIAL", "ARCHIVED"],
-                  },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          200: { description: "Estado atualizado" },
-          400: { description: "Transição inválida" },
           403: { description: "Sem permissão" },
           404: { description: "Banco não encontrado" },
         },
@@ -716,52 +738,8 @@ export const swaggerSpec = {
         },
       },
     },
-
+    
     // ============ AI Routes ============
-    "/ai/config": {
-      get: {
-        summary: "Obter configuração de IA",
-        tags: ["IA (Groq)"],
-        security: [{ bearerAuth: [] }],
-        responses: {
-          200: { description: "Configuração atual" },
-        },
-      },
-      post: {
-        summary: "Configurar API key do Groq",
-        tags: ["IA (Groq)"],
-        security: [{ bearerAuth: [] }],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                required: ["apiKey"],
-                properties: {
-                  apiKey: { type: "string", description: "API key do Groq" },
-                  model: { type: "string", description: "Modelo a usar (opcional)" },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          200: { description: "Configuração guardada" },
-          400: { description: "API key inválida" },
-        },
-      },
-    },
-    "/ai/models": {
-      get: {
-        summary: "Listar modelos de IA disponíveis",
-        tags: ["IA (Groq)"],
-        security: [{ bearerAuth: [] }],
-        responses: {
-          200: { description: "Lista de modelos" },
-        },
-      },
-    },
     "/ai/generate-questions": {
       post: {
         summary: "Gerar questões usando IA",
@@ -794,11 +772,6 @@ export const swaggerSpec = {
                   language: { type: "string", default: "pt-PT" },
                   additionalInstructions: { type: "string", description: "Instruções adicionais para a IA" },
                   saveToBank: { type: "boolean", default: false, description: "Guardar questões no banco" },
-                  requireApproval: {
-                    type: "boolean",
-                    default: false,
-                    description: "Se true, cria uma geração PENDING para revisão/aprovação antes de guardar (requer bankId)",
-                  },
                 },
               },
             },
@@ -811,72 +784,6 @@ export const swaggerSpec = {
       },
     },
 
-    "/ai/generations/{id}": {
-      get: {
-        summary: "Obter geração de IA (sugestões) por ID",
-        tags: ["IA (Groq)"],
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          { name: "id", in: "path", required: true, schema: { type: "string" } },
-        ],
-        responses: {
-          200: { description: "Geração" },
-          404: { description: "Não encontrada" },
-        },
-      },
-    },
-    "/ai/generations/{id}/approve": {
-      post: {
-        summary: "Aprovar/aplicar sugestões e criar questões no banco",
-        tags: ["IA (Groq)"],
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          { name: "id", in: "path", required: true, schema: { type: "string" } },
-        ],
-        requestBody: {
-          required: false,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  approvals: {
-                    type: "array",
-                    description: "Lista de decisões por índice; se omitido aprova tudo",
-                    items: {
-                      type: "object",
-                      required: ["index"],
-                      properties: {
-                        index: { type: "integer", minimum: 0 },
-                        approved: { type: "boolean", default: true },
-                        edits: {
-                          type: "object",
-                          description: "Edições opcionais antes de guardar",
-                          properties: {
-                            type: { type: "string" },
-                            stem: { type: "string" },
-                            difficulty: { type: "integer", minimum: 1, maximum: 4 },
-                            labels: { type: "array", items: { type: "string" } },
-                            chapterTags: { type: "array", items: { type: "string" } },
-                            options: { type: "array" },
-                            acceptableAnswers: { type: "array", items: { type: "string" } },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        responses: {
-          200: { description: "Aplicado com sucesso" },
-          400: { description: "Geração não pendente ou dados inválidos" },
-          404: { description: "Não encontrada" },
-        },
-      },
-    },
     "/ai/improve-question": {
       post: {
         summary: "Melhorar uma questão existente usando IA",

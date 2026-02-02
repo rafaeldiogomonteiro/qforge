@@ -1,10 +1,12 @@
 <script>
   import { api } from "$lib/api/client";
   import { goto } from "$app/navigation";
+  import { browser } from "$app/environment";
   import { onMount } from "svelte";
 
   export let data;
   const bankId = data.bankId;
+  const storageKey = `question-draft-${bankId}`;
 
   const TYPES = [
     { value: "MULTIPLE_CHOICE", label: "Escolha múltipla" },
@@ -28,12 +30,70 @@
   let type = "MULTIPLE_CHOICE";
   let stem = "";
   let difficulty = 2; // 1-4
-  let tagsText = ""; // input "tag1, tag2" (legacy)
   let selectedLabels = []; // array of label IDs
   let selectedChapterTags = []; // array of chapter tag IDs
   let acceptableAnswersText = ""; // linhas (para SHORT_ANSWER)
+  let autosaveReady = false;
+  let showLabelsPanel = false;
+  let showChapterTagsPanel = false;
+
+  function loadDraft() {
+    if (!browser) return;
+
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return;
+
+      const draft = JSON.parse(raw);
+
+      type = draft.type ?? type;
+      stem = draft.stem ?? "";
+      difficulty = draft.difficulty ?? 2;
+      selectedLabels = draft.selectedLabels ?? [];
+      selectedChapterTags = draft.selectedChapterTags ?? [];
+      acceptableAnswersText = draft.acceptableAnswersText ?? "";
+
+      if (Array.isArray(draft.options)) {
+        options = draft.options;
+      } else if (draft.type) {
+        applyTypeDefaults(draft.type);
+      }
+    } catch (e) {
+      console.warn("Falha ao carregar rascunho da questão.", e);
+    }
+  }
+
+  function saveDraft(draftData) {
+    if (!browser || !autosaveReady) return;
+
+    const draft =
+      draftData ||
+      {
+        type,
+        stem,
+        difficulty,
+        selectedLabels,
+        selectedChapterTags,
+        acceptableAnswersText,
+        options
+      };
+
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(draft));
+    } catch (e) {
+      console.warn("Falha ao guardar rascunho da questão.", e);
+    }
+  }
+
+  function clearDraftStorage() {
+    if (!browser) return;
+    localStorage.removeItem(storageKey);
+  }
 
   onMount(async () => {
+    loadDraft();
+    autosaveReady = true;
+
     // Load available labels and chapter tags
     try {
       const [labelsRes, chapterTagsRes] = await Promise.all([
@@ -46,6 +106,17 @@
       console.error("Erro ao carregar labels/tags:", e);
     }
   });
+
+  $: autosaveReady &&
+    saveDraft({
+      type,
+      stem,
+      difficulty,
+      selectedLabels,
+      selectedChapterTags,
+      acceptableAnswersText,
+      options
+    });
 
   // options[] (para MULTIPLE_CHOICE e TRUE_FALSE)
   let options = [
@@ -88,13 +159,6 @@
   function setCorrectSingle(idx) {
     // manter "uma correta" por simplicidade e consistência no UI
     options = options.map((o, i) => ({ ...o, isCorrect: i === idx }));
-  }
-
-  function parseTags() {
-    return tagsText
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
   }
 
   function parseAcceptableAnswers() {
@@ -147,7 +211,6 @@
         type,
         stem: stem.trim(),
         difficulty: Number(difficulty),
-        tags: parseTags(),
         labels: selectedLabels,
         chapterTags: selectedChapterTags,
         source: "MANUAL",
@@ -166,6 +229,7 @@
 
       await api.post(`/banks/${bankId}/questions`, payload);
 
+      clearDraftStorage();
       await goto(`/app/banks/${bankId}`);
     } catch (e) {
       error = e?.response?.data?.message || "Erro ao criar questão.";
@@ -229,70 +293,82 @@
       />
     </div>
 
-    <!-- Tags -->
-    <div>
-      <label style="font-size: 14px;">Tags (separadas por vírgulas)</label>
-      <input
-        bind:value={tagsText}
-        placeholder="ex.: simplex, restrições, álgebra"
-        style="width: 100%; margin-top: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 10px;"
-      />
-    </div>
-
     <!-- Labels -->
     <div>
-      <label style="font-size: 14px;">Labels</label>
-      <div style="margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 150px; overflow-y: auto;">
-        {#if availableLabels.length === 0}
-          <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma label disponível. <a href="/app/labels">Criar labels</a></p>
-        {:else}
-          {#each availableLabels as label}
-            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer;">
-              <input
-                type="checkbox"
-                value={label._id}
-                checked={selectedLabels.includes(label._id)}
-                on:change={(e) => {
-                  if (e.target.checked) {
-                    selectedLabels = [...selectedLabels, label._id];
-                  } else {
-                    selectedLabels = selectedLabels.filter(id => id !== label._id);
-                  }
-                }}
-              />
-              <span style="font-size: 14px;">{label.name}</span>
-            </label>
-          {/each}
-        {/if}
-      </div>
+      <button
+        type="button"
+        class="btn"
+        on:click={() => (showLabelsPanel = !showLabelsPanel)}
+        style="width: 100%; justify-content: space-between; display: flex; align-items: center;"
+      >
+        <span>Labels (opcional)</span>
+        <span style="font-size: 12px; color: var(--muted);">{showLabelsPanel ? "Esconder ▲" : "Mostrar ▼"}</span>
+      </button>
+
+      {#if showLabelsPanel}
+        <div style="margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 150px; overflow-y: auto;">
+          {#if availableLabels.length === 0}
+            <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma label disponível. <a href="/app/labels">Criar labels</a></p>
+          {:else}
+            {#each availableLabels as label}
+              <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer;">
+                <input
+                  type="checkbox"
+                  value={label._id}
+                  checked={selectedLabels.includes(label._id)}
+                  on:change={(e) => {
+                    if (e.target.checked) {
+                      selectedLabels = [...selectedLabels, label._id];
+                    } else {
+                      selectedLabels = selectedLabels.filter(id => id !== label._id);
+                    }
+                  }}
+                />
+                <span style="font-size: 14px;">{label.name}</span>
+              </label>
+            {/each}
+          {/if}
+        </div>
+      {/if}
     </div>
 
     <!-- Chapter Tags -->
     <div>
-      <label style="font-size: 14px;">Chapter Tags</label>
-      <div style="margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 150px; overflow-y: auto;">
-        {#if availableChapterTags.length === 0}
-          <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma tag disponível. <a href="/app/chapter-tags">Criar tags</a></p>
-        {:else}
-          {#each availableChapterTags as tag}
-            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer;">
-              <input
-                type="checkbox"
-                value={tag._id}
-                checked={selectedChapterTags.includes(tag._id)}
-                on:change={(e) => {
-                  if (e.target.checked) {
-                    selectedChapterTags = [...selectedChapterTags, tag._id];
-                  } else {
-                    selectedChapterTags = selectedChapterTags.filter(id => id !== tag._id);
-                  }
-                }}
-              />
-              <span style="font-size: 14px;">{tag.name}</span>
-            </label>
-          {/each}
-        {/if}
-      </div>
+      <button
+        type="button"
+        class="btn"
+        on:click={() => (showChapterTagsPanel = !showChapterTagsPanel)}
+        style="width: 100%; justify-content: space-between; display: flex; align-items: center;"
+      >
+        <span>Chapter Tags (opcional)</span>
+        <span style="font-size: 12px; color: var(--muted);">{showChapterTagsPanel ? "Esconder ▲" : "Mostrar ▼"}</span>
+      </button>
+
+      {#if showChapterTagsPanel}
+        <div style="margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 150px; overflow-y: auto;">
+          {#if availableChapterTags.length === 0}
+            <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma tag disponível. <a href="/app/chapter-tags">Criar tags</a></p>
+          {:else}
+            {#each availableChapterTags as tag}
+              <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; cursor: pointer;">
+                <input
+                  type="checkbox"
+                  value={tag._id}
+                  checked={selectedChapterTags.includes(tag._id)}
+                  on:change={(e) => {
+                    if (e.target.checked) {
+                      selectedChapterTags = [...selectedChapterTags, tag._id];
+                    } else {
+                      selectedChapterTags = selectedChapterTags.filter(id => id !== tag._id);
+                    }
+                  }}
+                />
+                <span style="font-size: 14px;">{tag.name}</span>
+              </label>
+            {/each}
+          {/if}
+        </div>
+      {/if}
     </div>
 
     <!-- Options -->
@@ -373,6 +449,7 @@
       <a
         class="btn"
         href={`/app/banks/${bankId}`}
+        on:click={clearDraftStorage}
         style="padding: 10px 14px; text-decoration:none; display:inline-flex; align-items:center;"
       >
         Cancelar

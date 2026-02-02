@@ -2,6 +2,7 @@
   import { api } from "$lib/api/client";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
+  import { browser } from "$app/environment";
 
   const DIFFICULTY_LABELS = {
     1: "Básico",
@@ -29,6 +30,8 @@
 
   let selectedLabels = []; // array of label IDs
   let selectedChapterTags = []; // array of chapter tag IDs
+  let showLabelsBox = false;
+  let showChapterTagsBox = false;
 
   let language = "pt-PT";
   let additionalInstructions = "";
@@ -46,7 +49,78 @@
   let savingToBank = false;
   let selectedBankForSave = "";
 
-  onMount(loadBanks);
+  // autosave
+  const storageKey = "ai-generate-draft";
+  let autosaveReady = false;
+
+  function loadDraft() {
+    if (!browser) return;
+
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return;
+
+      const draft = JSON.parse(raw);
+
+      bankId = draft.bankId ?? "";
+      topic = draft.topic ?? "";
+      content = draft.content ?? "";
+      numQuestions = Number(draft.numQuestions) || 5;
+      types = Array.isArray(draft.types) && draft.types.length ? draft.types : ["MULTIPLE_CHOICE"];
+      difficulties = Array.isArray(draft.difficulties) && draft.difficulties.length ? draft.difficulties : [2];
+      selectedLabels = draft.selectedLabels ?? [];
+      selectedChapterTags = draft.selectedChapterTags ?? [];
+      language = draft.language ?? "pt-PT";
+      additionalInstructions = draft.additionalInstructions ?? "";
+    } catch (e) {
+      console.warn("Falha ao carregar rascunho da geração de questões.", e);
+    }
+  }
+
+  function saveDraft(draftData) {
+    if (!browser || !autosaveReady) return;
+
+    const draft =
+      draftData ||
+      {
+        bankId,
+        topic,
+        content,
+        numQuestions,
+        types,
+        difficulties,
+        selectedLabels,
+        selectedChapterTags,
+        language,
+        additionalInstructions
+      };
+
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(draft));
+    } catch (e) {
+      console.warn("Falha ao guardar rascunho da geração de questões.", e);
+    }
+  }
+
+  onMount(() => {
+    loadDraft();
+    autosaveReady = true;
+    loadBanks();
+  });
+
+  $: autosaveReady &&
+    saveDraft({
+      bankId,
+      topic,
+      content,
+      numQuestions,
+      types,
+      difficulties,
+      selectedLabels,
+      selectedChapterTags,
+      language,
+      additionalInstructions
+    });
 
   async function loadBanks() {
     banksLoading = true;
@@ -222,7 +296,7 @@
       </div>
 
       <div>
-        <label style="font-size: 13px; color: var(--muted);">Topic (opcional)</label>
+        <label style="font-size: 13px; color: var(--muted);">Topic</label>
         <input
           bind:value={topic}
           placeholder="ex.: Programação Linear — Método Simplex"
@@ -384,78 +458,90 @@
 
       <!-- Labels -->
       <div>
-        <label style="font-size: 13px; color: var(--muted); margin-bottom: 6px; display: block;">
-          Labels (opcional)
-          {#if selectedLabels.length > 0}
-            <span style="color: #1d4ed8; font-weight: 500;"> - {selectedLabels.length} selecionada(s)</span>
-          {/if}
-        </label>
-        <div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px; max-height: 180px; overflow-y: auto; background: white;">
-          {#if availableLabels.length === 0}
-            <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma label disponível. <a href="/app/labels" style="color: #1d4ed8;">Criar labels</a></p>
-          {:else}
-            <div style="display: grid; gap: 8px;">
-              {#each availableLabels as label}
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px; border-radius: 8px; transition: background 0.2s;" class="checkbox-hover">
-                  <input
-                    type="checkbox"
-                    value={label._id}
-                    checked={selectedLabels.includes(label._id)}
-                    on:change={(e) => {
-                      if (e.target.checked) {
-                        selectedLabels = [...selectedLabels, label._id];
-                      } else {
-                        selectedLabels = selectedLabels.filter(id => id !== label._id);
-                      }
-                    }}
-                    style="width: 16px; height: 16px;"
-                  />
-                  <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #ecfeff; border: 1px solid #a5f3fc;">
-                    📝 {label.name}
-                  </span>
-                </label>
-              {/each}
-            </div>
-          {/if}
-        </div>
+        <button
+          type="button"
+          class="btn"
+          on:click={() => (showLabelsBox = !showLabelsBox)}
+          style="width: 100%; justify-content: space-between; display: flex; align-items: center;"
+        >
+          <span>Labels (opcional){#if selectedLabels.length > 0} — {selectedLabels.length} selecionada(s){/if}</span>
+          <span style="font-size: 12px; color: var(--muted);">{showLabelsBox ? "Esconder ▲" : "Mostrar ▼"}</span>
+        </button>
+
+        {#if showLabelsBox}
+          <div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px; max-height: 180px; overflow-y: auto; background: white; margin-top: 6px;">
+            {#if availableLabels.length === 0}
+              <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma label disponível. <a href="/app/labels" style="color: #1d4ed8;">Criar labels</a></p>
+            {:else}
+              <div style="display: grid; gap: 8px;">
+                {#each availableLabels as label}
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px; border-radius: 8px; transition: background 0.2s;" class="checkbox-hover">
+                    <input
+                      type="checkbox"
+                      value={label._id}
+                      checked={selectedLabels.includes(label._id)}
+                      on:change={(e) => {
+                        if (e.target.checked) {
+                          selectedLabels = [...selectedLabels, label._id];
+                        } else {
+                          selectedLabels = selectedLabels.filter(id => id !== label._id);
+                        }
+                      }}
+                      style="width: 16px; height: 16px;"
+                    />
+                    <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #ecfeff; border: 1px solid #a5f3fc;">
+                      📝 {label.name}
+                    </span>
+                  </label>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
       </div>
 
       <!-- Chapter Tags -->
       <div>
-        <label style="font-size: 13px; color: var(--muted); margin-bottom: 6px; display: block;">
-          Chapter Tags (opcional)
-          {#if selectedChapterTags.length > 0}
-            <span style="color: #7c3aed; font-weight: 500;"> - {selectedChapterTags.length} selecionada(s)</span>
-          {/if}
-        </label>
-        <div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px; max-height: 180px; overflow-y: auto; background: white;">
-          {#if availableChapterTags.length === 0}
-            <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma tag disponível. <a href="/app/chapter-tags" style="color: #7c3aed;">Criar tags</a></p>
-          {:else}
-            <div style="display: grid; gap: 8px;">
-              {#each availableChapterTags as tag}
-                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px; border-radius: 8px; transition: background 0.2s;" class="checkbox-hover">
-                  <input
-                    type="checkbox"
-                    value={tag._id}
-                    checked={selectedChapterTags.includes(tag._id)}
-                    on:change={(e) => {
-                      if (e.target.checked) {
-                        selectedChapterTags = [...selectedChapterTags, tag._id];
-                      } else {
-                        selectedChapterTags = selectedChapterTags.filter(id => id !== tag._id);
-                      }
-                    }}
-                    style="width: 16px; height: 16px;"
-                  />
-                  <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #f5f3ff; border: 1px solid #c4b5fd;">
-                    📚 {tag.name}
-                  </span>
-                </label>
-              {/each}
-            </div>
-          {/if}
-        </div>
+        <button
+          type="button"
+          class="btn"
+          on:click={() => (showChapterTagsBox = !showChapterTagsBox)}
+          style="width: 100%; justify-content: space-between; display: flex; align-items: center;"
+        >
+          <span>Chapter Tags (opcional){#if selectedChapterTags.length > 0} — {selectedChapterTags.length} selecionada(s){/if}</span>
+          <span style="font-size: 12px; color: var(--muted);">{showChapterTagsBox ? "Esconder ▲" : "Mostrar ▼"}</span>
+        </button>
+
+        {#if showChapterTagsBox}
+          <div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px; max-height: 180px; overflow-y: auto; background: white; margin-top: 6px;">
+            {#if availableChapterTags.length === 0}
+              <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma tag disponível. <a href="/app/chapter-tags" style="color: #7c3aed;">Criar tags</a></p>
+            {:else}
+              <div style="display: grid; gap: 8px;">
+                {#each availableChapterTags as tag}
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px; border-radius: 8px; transition: background 0.2s;" class="checkbox-hover">
+                    <input
+                      type="checkbox"
+                      value={tag._id}
+                      checked={selectedChapterTags.includes(tag._id)}
+                      on:change={(e) => {
+                        if (e.target.checked) {
+                          selectedChapterTags = [...selectedChapterTags, tag._id];
+                        } else {
+                          selectedChapterTags = selectedChapterTags.filter(id => id !== tag._id);
+                        }
+                      }}
+                      style="width: 16px; height: 16px;"
+                    />
+                    <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #f5f3ff; border: 1px solid #c4b5fd;">
+                      📚 {tag.name}
+                    </span>
+                  </label>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/if}
       </div>
 
       <div>

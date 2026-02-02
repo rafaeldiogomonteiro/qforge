@@ -107,7 +107,8 @@
   }
 
   function hydrate(q) {
-    bankId = q.bank;
+    // garantir que bankId fica como string de ID
+    bankId = typeof q.bank === "string" ? q.bank : q.bank?._id || "";
     type = q.type;
     stem = q.stem || "";
     difficulty = q.difficulty ?? 2;
@@ -204,12 +205,6 @@
     <div style="display:flex; align-items:flex-end; justify-content:space-between; gap: 16px;">
       <div>
         <h2 style="margin: 0;">Editar Questão</h2>
-        <p style="margin: 6px 0 0; color: var(--muted);">
-          ID:
-          <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">
-            {id}
-          </span>
-        </p>
       </div>
 
       {#if bankId}

@@ -266,6 +266,7 @@ export async function exportBank(req, res) {
   try {
     const { id } = req.params;
     const format = (req.query.format || "").toLowerCase();
+    const idsRaw = (req.query.ids || "").trim();
 
     const supported = ["gift", "aiken", "moodle"];    
     if (!supported.includes(format)) {
@@ -282,10 +283,26 @@ export async function exportBank(req, res) {
       return res.status(403).json({ error: "Não tens permissão para exportar este banco" });
     }
 
-    const questions = await Question.find({ bank: bank._id }).lean();
+    let questionFilter = { bank: bank._id };
+    if (idsRaw) {
+      const ids = idsRaw
+        .split(",")
+        .map((i) => i.trim())
+        .filter(Boolean);
+      if (ids.length > 0) {
+        questionFilter._id = { $in: ids };
+      }
+    }
+
+    const questions = await Question.find(questionFilter).lean();
 
     // Marca utilização: cada export incrementa 1 uso por questão do banco
-    await Question.updateMany({ bank: bank._id }, { $inc: { usageCount: 1 } });
+    if (questions.length > 0) {
+      await Question.updateMany(
+        { _id: { $in: questions.map((q) => q._id) } },
+        { $inc: { usageCount: 1 } }
+      );
+    }
 
     let content = "";
     let filename = `${bank.title || "banco"}`.replace(/[^a-zA-Z0-9_-]/g, "_");

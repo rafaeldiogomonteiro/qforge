@@ -8,6 +8,7 @@
   let questions = [];
   let loading = true;
   let error = "";
+  let selected = new Set();
 
   // Available labels and chapter tags for filters
   let availableLabels = [];
@@ -61,7 +62,9 @@
     exportError = "";
 
     try {
-      const response = await api.get(`/banks/${bank._id}/export?format=${format}`, {
+      const ids = Array.from(selected);
+      const idsParam = ids.length ? `&ids=${ids.join(",")}` : "";
+      const response = await api.get(`/banks/${bank._id}/export?format=${format}${idsParam}`, {
         responseType: 'blob'
       });
 
@@ -159,6 +162,23 @@
     expanded = next;
   }
 
+  function toggleSelect(id) {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    selected = next;
+  }
+
+  function selectFilteredAll() {
+    const next = new Set(selected);
+    filtered.forEach((q) => next.add(q._id));
+    selected = next;
+  }
+
+  function clearSelection() {
+    selected = new Set();
+  }
+
   $: filtered = questions.filter((q) => {
     if (fType !== "ALL" && q.type !== fType) return false;
     if (fSource !== "ALL" && q.source !== fSource) return false;
@@ -227,7 +247,12 @@
         </div>
 
         <p style="margin: 0 0 16px 0; color: var(--muted); font-size: 14px;">
-          Seleciona o formato de exportação para o banco <strong>{bank.title}</strong> ({questions.length} questões).
+          Seleciona o formato de exportação para o banco <strong>{bank.title}</strong>.
+          {#if selected.size > 0}
+            <br />Exportar {selected.size} questão(ões) selecionadas.
+          {:else}
+            <br />Sem seleção → exporta todas ({questions.length}) do banco.
+          {/if}
         </p>
 
         {#if exportError}
@@ -406,6 +431,15 @@
 
     <div style="margin-top: 10px; color: var(--muted); font-size: 13px;">
       A mostrar <b>{filtered.length}</b> de <b>{questions.length}</b> questões.
+      <button class="btn" type="button" style="margin-left: 10px; padding: 6px 10px;" on:click={selectFilteredAll}>
+        Selecionar estas
+      </button>
+      <button class="btn" type="button" style="margin-left: 6px; padding: 6px 10px;" on:click={clearSelection}>
+        Limpar seleção
+      </button>
+      {#if selected.size > 0}
+        <span style="margin-left: 8px; color: var(--muted);">Selecionadas: {selected.size}</span>
+      {/if}
     </div>
   </div>
 
@@ -421,7 +455,13 @@
           <div style="border: 1px solid var(--border); border-radius: 12px; padding: 16px;">
             <!-- Top row -->
             <div style="display:flex; justify-content:space-between; gap: 12px; align-items:flex-start;">
-              <div style="display:flex; gap: 8px; flex-wrap: wrap;">
+              <div style="display:flex; gap: 8px; flex-wrap: wrap; align-items:center;">
+                <input
+                  type="checkbox"
+                  checked={selected.has(q._id)}
+                  on:change={() => toggleSelect(q._id)}
+                  style="width:16px; height:16px;"
+                />
                 <span style={badgeStyle("type", q.type)}>{typeLabel(q.type)}</span>
                 <span style={badgeStyle("source", q.source)}>{q.source}</span>
                 <span style={badgeStyle("difficulty", q.difficulty)}>{difficultyLabel(q.difficulty)}</span>
@@ -482,23 +522,27 @@
             {/if}
 
             <!-- Labels -->
-            {#if (q.labels || []).length > 0}
+            {#if (q.labels || []).some(l => typeof l !== 'string' && l?.name)}
               <div style="margin-top: 10px; display:flex; gap:6px; flex-wrap: wrap;">
                 {#each q.labels as label}
+                  {#if typeof label !== 'string' && label?.name}
                   <span style="display:inline-flex; padding:3px 8px; border-radius:999px; font-size:12px; border:1px solid #a5f3fc; background:#ecfeff; color:#155e75;">
-                    📝 {typeof label === 'string' ? label : label.name}
+                    📝 {label.name}
                   </span>
+                  {/if}
                 {/each}
               </div>
             {/if}
 
             <!-- Chapter Tags -->
-            {#if (q.chapterTags || []).length > 0}
+            {#if (q.chapterTags || []).some(t => typeof t !== 'string' && t?.name)}
               <div style="margin-top: 10px; display:flex; gap:6px; flex-wrap: wrap;">
                 {#each q.chapterTags as tag}
+                  {#if typeof tag !== 'string' && tag?.name}
                   <span style="display:inline-flex; padding:3px 8px; border-radius:999px; font-size:12px; border:1px solid #c4b5fd; background:#f5f3ff; color:#6b21a8;">
-                    📚 {typeof tag === 'string' ? tag : tag.name}
+                    📚 {tag.name}
                   </span>
+                  {/if}
                 {/each}
               </div>
             {/if}

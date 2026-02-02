@@ -218,12 +218,9 @@
               <div style="font-weight: 500; font-size: 15px;">
                 {label.name}
               </div>
-              <div style="font-size: 13px; color: var(--muted); margin-top: 4px;">
-                ID: {label._id}
-                {#if !label.isActive}
-                  <span style="color: #b91c1c; margin-left: 8px;">● Inativa</span>
-                {/if}
-              </div>
+              {#if !label.isActive}
+                <div style="font-size: 13px; color: #b91c1c; margin-top: 4px;">● Inativa</div>
+              {/if}
             </div>
 
             <div style="display: flex; gap: 8px; flex-shrink: 0;">

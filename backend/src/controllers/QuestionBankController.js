@@ -232,32 +232,169 @@ function questionsToMoodleXml(questions, bankName = "Banco") {
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&apos;");
 
-  const xmlQuestions = questions
-    .map((q) => {
-      const name = escapeXml(q.title || "Pergunta");
-      const text = escapeXml(q.text || "");
-      const options = q.options || [];
-      const correctIndex = q.correctIndex ?? options.findIndex((o) => o.isCorrect);
+  const asText = (value) => (value == null ? "" : String(value));
 
-      const answersXml = options
-        .map((opt, idx) => {
-          const fraction = idx === correctIndex ? 100 : 0;
-          const answerText = escapeXml(opt.text ?? opt);
-          return `    <answer fraction="${fraction}"><text>${answerText}</text></answer>`;
-        })
-        .join("\n");
+  const sanitizeStem = (q) => asText(q.stem || q.text || q.question || "");
+  const sanitizeName = (q) => {
+    const raw = asText(q.title || sanitizeStem(q) || "Pergunta").trim();
+    return raw || "Pergunta";
+  };
 
-      return `  <question type="multichoice">
-    <name><text>${name}</text></name>
-    <questiontext format="html"><text>${text}</text></questiontext>
+  const formatTextTag = (value, format = "html") =>
+    `<text>${escapeXml(asText(value))}</text>`;
+
+  const defaultGrade = "1.0000000";
+  const penalty = "0.0000000";
+  const hidden = "0";
+
+  const buildCategory = (name) => `  <question type="category">
+    <category>
+      <text>$course$/top/${escapeXml(name || "Banco")}</text>
+    </category>
+  </question>`;
+
+  const buildMultichoice = (q) => {
+    const options = (q.options || []).map((opt) => ({
+      text: asText(opt?.text ?? opt ?? ""),
+      isCorrect: Boolean(opt?.isCorrect),
+    }));
+
+    if (options.length === 0) {
+      return null; // Moodle ignora perguntas sem respostas; evitamos XML inválido
+    }
+
+    const anyMarked = options.some((o) => o.isCorrect);
+    const preparedOptions = anyMarked
+      ? options
+      : options.map((opt, idx) => ({ ...opt, isCorrect: idx === 0 }));
+
+    const correctCount = Math.max(
+      1,
+      preparedOptions.filter((o) => o.isCorrect).length
+    );
+    const single = correctCount === 1 ? "true" : "false";
+
+    const answersXml = preparedOptions
+      .map((opt) => {
+        const fraction = opt.isCorrect ? 100 / correctCount : 0;
+        return `    <answer fraction="${fraction}" format="html">
+      ${formatTextTag(opt.text)}
+      <feedback format="html"><text></text></feedback>
+    </answer>`;
+      })
+      .join("\n");
+
+    return `  <question type="multichoice">
+    <name>${formatTextTag(sanitizeName(q))}</name>
+    <questiontext format="html">${formatTextTag(sanitizeStem(q))}</questiontext>
+    <generalfeedback format="html"><text></text></generalfeedback>
+    <defaultgrade>${defaultGrade}</defaultgrade>
+    <penalty>${penalty}</penalty>
+    <hidden>${hidden}</hidden>
+    <single>${single}</single>
+    <shuffleanswers>1</shuffleanswers>
+    <answernumbering>abc</answernumbering>
 ${answersXml}
   </question>`;
-    })
-    .join("\n");
+  };
+
+  const buildTrueFalse = (q) => {
+    const options = (q.options || []).map((opt) => ({
+      text: asText(opt?.text ?? opt ?? ""),
+      isCorrect: Boolean(opt?.isCorrect),
+    }));
+
+    const hasTrueCorrect = options.some(
+      (o) => o.isCorrect && /^true|verdadeiro$/i.test(o.text.trim())
+    );
+    const hasFalseCorrect = options.some(
+      (o) => o.isCorrect && /^false|falso$/i.test(o.text.trim())
+    );
+
+    const correctIsTrue =
+      hasTrueCorrect || (!hasFalseCorrect && !hasTrueCorrect && true);
+
+    return `  <question type="truefalse">
+    <name>${formatTextTag(sanitizeName(q))}</name>
+    <questiontext format="html">${formatTextTag(sanitizeStem(q))}</questiontext>
+    <generalfeedback format="html"><text></text></generalfeedback>
+    <defaultgrade>${defaultGrade}</defaultgrade>
+    <penalty>${penalty}</penalty>
+    <hidden>${hidden}</hidden>
+    <answer fraction="${correctIsTrue ? "100" : "0"}" format="html">
+      <text>true</text>
+      <feedback format="html"><text></text></feedback>
+    </answer>
+    <answer fraction="${correctIsTrue ? "0" : "100"}" format="html">
+      <text>false</text>
+      <feedback format="html"><text></text></feedback>
+    </answer>
+  </question>`;
+  };
+
+  const buildShortAnswer = (q) => {
+    const answers = (q.acceptableAnswers || [])
+      .map((a) => asText(a).trim())
+      .filter(Boolean);
+
+    if (answers.length === 0) {
+      return null;
+    }
+
+    const answersXml = answers
+      .map(
+        (ans) => `    <answer fraction="100" format="moodle_auto_format">
+      ${formatTextTag(ans, "moodle_auto_format")}
+      <feedback format="html"><text></text></feedback>
+    </answer>`
+      )
+      .join("\n");
+
+    return `  <question type="shortanswer">
+    <name>${formatTextTag(sanitizeName(q))}</name>
+    <questiontext format="html">${formatTextTag(sanitizeStem(q))}</questiontext>
+    <generalfeedback format="html"><text></text></generalfeedback>
+    <defaultgrade>${defaultGrade}</defaultgrade>
+    <penalty>${penalty}</penalty>
+    <hidden>${hidden}</hidden>
+    <usecase>0</usecase>
+${answersXml}
+  </question>`;
+  };
+
+  const buildEssay = (q) => `  <question type="essay">
+    <name>${formatTextTag(sanitizeName(q))}</name>
+    <questiontext format="html">${formatTextTag(sanitizeStem(q))}</questiontext>
+    <generalfeedback format="html"><text></text></generalfeedback>
+    <defaultgrade>${defaultGrade}</defaultgrade>
+    <penalty>${penalty}</penalty>
+    <hidden>${hidden}</hidden>
+    <responseformat>editor</responseformat>
+    <responserequired>1</responserequired>
+    <responsefieldlines>10</responsefieldlines>
+    <attachments>0</attachments>
+    <attachmentsrequired>0</attachmentsrequired>
+    <graderinfo format="html"><text></text></graderinfo>
+    <responsetemplate format="html"><text></text></responsetemplate>
+  </question>`;
+
+  const buildQuestion = (q) => {
+    const qType = String(q.type || "MULTIPLE_CHOICE").toUpperCase();
+    if (qType === "MULTIPLE_CHOICE") return buildMultichoice(q);
+    if (qType === "TRUE_FALSE") return buildTrueFalse(q);
+    if (qType === "SHORT_ANSWER") return buildShortAnswer(q);
+    if (qType === "OPEN") return buildEssay(q);
+    return buildMultichoice(q); // fallback
+  };
+
+  const blocks = [
+    buildCategory(bankName),
+    ...questions.map((q) => buildQuestion(q)).filter(Boolean),
+  ];
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <quiz>
-${xmlQuestions}
+${blocks.join("\n")}
 </quiz>`;
 }
 

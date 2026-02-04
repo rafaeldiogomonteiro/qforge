@@ -181,11 +181,29 @@ export async function deleteBank(req, res) {
 }
 
 // Helpers para exportação
+function extractNames(values = []) {
+  return (values || [])
+    .map((v) => (typeof v === "string" ? v : v?.name))
+    .map((v) => String(v || "").trim())
+    .filter(Boolean);
+}
+
+function buildMetaCommentLines(q) {
+  const lines = [];
+  const labelNames = extractNames(q.labels);
+  const chapterNames = extractNames(q.chapterTags);
+
+  if (labelNames.length) lines.push(`// Etiquetas: ${labelNames.join(", ")}`);
+  if (chapterNames.length)
+    lines.push(`// Etiquetas de capítulo: ${chapterNames.join(", ")}`);
+  return lines;
+}
+
 function questionsToGift(questions) {
   return questions
     .map((q) => {
-      const title = q.title || "Pergunta";
-      const text = q.text || "";
+      const title = q.title || q.stem || "Pergunta";
+      const text = q.text || q.stem || "";
       const options = q.options || [];
       const correctIndex = q.correctIndex ?? options.findIndex((o) => o.isCorrect);
 
@@ -197,7 +215,8 @@ function questionsToGift(questions) {
         })
         .join(" ");
 
-      return `${header} {${body}}`;
+      const meta = buildMetaCommentLines(q);
+      return [...meta, `${header} {${body}}`].join("\n");
     })
     .join("\n\n");
 }
@@ -205,13 +224,14 @@ function questionsToGift(questions) {
 function questionsToAiken(questions) {
   return questions
     .map((q) => {
-      const title = q.title || q.text || "Pergunta";
+      const title = q.title || q.text || q.stem || "Pergunta";
       const options = q.options || [];
       const correctIndex = q.correctIndex ?? options.findIndex((o) => o.isCorrect);
 
       const letters = ["A", "B", "C", "D", "E", "F"]; // suporte básico
       const lines = [];
 
+      lines.push(...buildMetaCommentLines(q));
       lines.push(title);
       options.forEach((opt, idx) => {
         const letter = letters[idx] || String.fromCharCode(65 + idx);
@@ -245,6 +265,17 @@ function questionsToMoodleXml(questions, bankName = "Banco") {
 
   const formatTextTag = (value, format = "html") =>
     `<text>${escapeXml(asText(value))}</text>`;
+
+  const buildTagsBlock = (q) => {
+    const labelTags = extractNames(q.labels).map((name) => `label:${name}`);
+    const chapterTags = extractNames(q.chapterTags).map((name) => `chapter:${name}`);
+    const merged = [...labelTags, ...chapterTags];
+    if (merged.length === 0) return "";
+    const tagsXml = merged
+      .map((t) => `    <tag><text>${escapeXml(t)}</text></tag>`)
+      .join("\n");
+    return `    <tags>\n${tagsXml}\n    </tags>`;
+  };
 
   const defaultGrade = "1.0000000";
   const penalty = "0.0000000";
@@ -287,6 +318,8 @@ function questionsToMoodleXml(questions, bankName = "Banco") {
       })
       .join("\n");
 
+    const tagsBlock = buildTagsBlock(q);
+
     return `  <question type="multichoice">
     <name>${formatTextTag(sanitizeName(q))}</name>
     <questiontext format="html">${formatTextTag(sanitizeStem(q))}</questiontext>
@@ -297,7 +330,7 @@ function questionsToMoodleXml(questions, bankName = "Banco") {
     <single>${single}</single>
     <shuffleanswers>1</shuffleanswers>
     <answernumbering>abc</answernumbering>
-${answersXml}
+  ${tagsBlock ? `${tagsBlock}\n` : ""}${answersXml}
   </question>`;
   };
 
@@ -317,6 +350,8 @@ ${answersXml}
     const correctIsTrue =
       hasTrueCorrect || (!hasFalseCorrect && !hasTrueCorrect && true);
 
+    const tagsBlock = buildTagsBlock(q);
+
     return `  <question type="truefalse">
     <name>${formatTextTag(sanitizeName(q))}</name>
     <questiontext format="html">${formatTextTag(sanitizeStem(q))}</questiontext>
@@ -324,7 +359,7 @@ ${answersXml}
     <defaultgrade>${defaultGrade}</defaultgrade>
     <penalty>${penalty}</penalty>
     <hidden>${hidden}</hidden>
-    <answer fraction="${correctIsTrue ? "100" : "0"}" format="html">
+${tagsBlock ? `${tagsBlock}\n` : ""}    <answer fraction="${correctIsTrue ? "100" : "0"}" format="html">
       <text>true</text>
       <feedback format="html"><text></text></feedback>
     </answer>
@@ -353,6 +388,8 @@ ${answersXml}
       )
       .join("\n");
 
+    const tagsBlock = buildTagsBlock(q);
+
     return `  <question type="shortanswer">
     <name>${formatTextTag(sanitizeName(q))}</name>
     <questiontext format="html">${formatTextTag(sanitizeStem(q))}</questiontext>
@@ -361,11 +398,14 @@ ${answersXml}
     <penalty>${penalty}</penalty>
     <hidden>${hidden}</hidden>
     <usecase>0</usecase>
-${answersXml}
+  ${tagsBlock ? `${tagsBlock}\n` : ""}${answersXml}
   </question>`;
   };
 
-  const buildEssay = (q) => `  <question type="essay">
+  const buildEssay = (q) => {
+    const tagsBlock = buildTagsBlock(q);
+
+    return `  <question type="essay">
     <name>${formatTextTag(sanitizeName(q))}</name>
     <questiontext format="html">${formatTextTag(sanitizeStem(q))}</questiontext>
     <generalfeedback format="html"><text></text></generalfeedback>
@@ -379,7 +419,8 @@ ${answersXml}
     <attachmentsrequired>0</attachmentsrequired>
     <graderinfo format="html"><text></text></graderinfo>
     <responsetemplate format="html"><text></text></responsetemplate>
-  </question>`;
+${tagsBlock ? `${tagsBlock}\n` : ""}  </question>`;
+  };
 
   const buildQuestion = (q) => {
     const qType = String(q.type || "MULTIPLE_CHOICE").toUpperCase();
@@ -434,7 +475,10 @@ export async function exportBank(req, res) {
       }
     }
 
-    const questions = await Question.find(questionFilter).lean();
+    const questions = await Question.find(questionFilter)
+      .populate("labels", "name")
+      .populate("chapterTags", "name")
+      .lean();
 
     // Marca utilização: cada export incrementa 1 uso por questão do banco
     if (questions.length > 0) {

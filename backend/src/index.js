@@ -18,8 +18,10 @@ import questionRoutes from "./routes/questionRoutes.js";
 import labelRoutes from "./routes/labelRoutes.js";
 import chapterTagRoutes from "./routes/chapterTagRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
+import folderRoutes from "./routes/folderRoutes.js";
 import User from "./models/User.js";
 import Label from "./models/Label.js";
+import ChapterTagFolder from "./models/ChapterTagFolder.js";
 import ChapterTag from "./models/ChapterTag.js";
 
 const app = express();
@@ -36,6 +38,7 @@ app.use("/banks", bankRoutes);
 app.use("/", questionRoutes);
 app.use("/labels", labelRoutes);
 app.use("/chapter-tags", chapterTagRoutes);
+app.use("/folders", folderRoutes);
 app.use("/ai", aiRoutes);
 
 // Rotas de teste/desenvolvimento
@@ -52,8 +55,12 @@ async function start() {
   try {
     await connectDB();
 
-    // Garante que os índices refletem o esquema atual (inclui índices por owner em labels e chapterTags)
-    await Promise.all([Label.syncIndexes(), ChapterTag.syncIndexes()]);
+    // Garante que os índices refletem o esquema atual (inclui índices por owner)
+    await Promise.all([
+      Label.syncIndexes(),
+      ChapterTagFolder.syncIndexes(),
+      ChapterTag.syncIndexes(),
+    ]);
 
     app.listen(PORT, () => {
       console.log(`🚀 Server a correr em http://localhost:${PORT}`);

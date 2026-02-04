@@ -4,6 +4,12 @@ const chapterTagSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     normalizedName: { type: String, required: true, index: true },
+    folder: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ChapterTagFolder",
+      default: null,
+      index: true,
+    },
     owner: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -15,9 +21,9 @@ const chapterTagSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Cada utilizador só pode ter uma tag com o mesmo nome normalizado.
+// Cada utilizador só pode ter uma tag com o mesmo nome normalizado na mesma pasta.
 chapterTagSchema.index(
-  { owner: 1, normalizedName: 1 },
+  { owner: 1, folder: 1, normalizedName: 1 },
   { unique: true, partialFilterExpression: { owner: { $exists: true } } }
 );
 

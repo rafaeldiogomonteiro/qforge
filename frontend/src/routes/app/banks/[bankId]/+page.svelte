@@ -104,6 +104,49 @@
     }
   }
 
+  async function importBank() {
+    if (!importContent.trim()) {
+      importError = "Carrega um ficheiro ou cola o conteúdo.";
+      return;
+    }
+
+    importLoading = true;
+    importError = "";
+    importResult = null;
+
+    try {
+      const { data } = await api.post(`/banks/${bank._id}/import`, {
+        format: importFormat,
+        content: importContent,
+      });
+
+      importResult = data;
+      await loadAll();
+      showImportModal = false;
+      importContent = "";
+      importFileName = "";
+    } catch (e) {
+      importError =
+        e?.response?.data?.error || e?.response?.data?.message || "Erro ao importar.";
+    } finally {
+      importLoading = false;
+    }
+  }
+
+  async function handleImportFile(event) {
+    importError = "";
+    importResult = null;
+    const file = event.target.files?.[0];
+    if (!file) return;
+    importFileName = file.name;
+    try {
+      const text = await file.text();
+      importContent = text;
+    } catch (err) {
+      importError = "Não foi possível ler o ficheiro.";
+    }
+  }
+
   function typeLabel(type) {
     return {
       MULTIPLE_CHOICE: "Escolha múltipla",
@@ -111,6 +154,14 @@
       SHORT_ANSWER: "Resposta curta",
       OPEN: "Aberta"
     }[type] || type;
+  }
+
+  function sourceLabel(source) {
+    return {
+      MANUAL: "Manual",
+      AI: "IA",
+      IMPORTED: "Importada"
+    }[source] || source;
   }
 
   function badgeStyle(kind, value) {
@@ -239,7 +290,7 @@
     <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
       <div style="background: white; border-radius: 14px; padding: 24px; width: 100%; max-width: 420px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Exportar Banco</h3>
+          <h3 style="margin: 0; font-size: 18px; font-weight: 600;">Exportar banco</h3>
           <button 
             on:click={() => showExportModal = false} 
             style="background: none; border: none; font-size: 20px; cursor: pointer; color: var(--muted);"
@@ -270,7 +321,7 @@
             <div style="display: flex; align-items: center; gap: 12px;">
               <span style="font-size: 24px;">📝</span>
               <div style="text-align: left;">
-                <div style="font-weight: 600;">GIFT Format</div>
+                <div style="font-weight: 600;">Formato GIFT</div>
                 <div style="font-size: 13px; color: var(--muted);">Formato nativo do Moodle para importação rápida</div>
               </div>
             </div>
@@ -284,7 +335,7 @@
             <div style="display: flex; align-items: center; gap: 12px;">
               <span style="font-size: 24px;">📋</span>
               <div style="text-align: left;">
-                <div style="font-weight: 600;">Aiken Format</div>
+                <div style="font-weight: 600;">Formato Aiken</div>
                 <div style="font-size: 13px; color: var(--muted);">Formato simples para escolha múltipla (.txt)</div>
               </div>
             </div>
@@ -322,6 +373,7 @@
     </div>
   {/if}
 
+
   <!-- Filtros -->
   <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 16px;">
     <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px;">
@@ -340,9 +392,9 @@
         <label style="font-size: 13px; color: var(--muted);">Origem</label>
         <select bind:value={fSource} style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;">
           <option value="ALL">Todas</option>
-          <option value="MANUAL">MANUAL</option>
-          <option value="AI">AI</option>
-          <option value="IMPORTED">IMPORTED</option>
+          <option value="MANUAL">Manual</option>
+          <option value="AI">IA</option>
+          <option value="IMPORTED">Importadas</option>
         </select>
       </div>
 
@@ -359,7 +411,7 @@
     </div>
 
     <div style="margin-top: 10px;">
-      <label style="font-size: 13px; color: var(--muted);">Pesquisa (stem/tags)</label>
+      <label style="font-size: 13px; color: var(--muted);">Pesquisa (enunciado/etiquetas)</label>
       <input
         bind:value={search}
         placeholder="ex.: simplex, restrições, dualidade..."
@@ -369,10 +421,10 @@
 
     <!-- Labels Filter -->
     <div style="margin-top: 10px;">
-      <label style="font-size: 13px; color: var(--muted);">Filtrar por Labels</label>
+      <label style="font-size: 13px; color: var(--muted);">Filtrar por etiquetas</label>
       <div style="margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 120px; overflow-y: auto; background: white;">
         {#if availableLabels.length === 0}
-          <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma label disponível</p>
+          <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma etiqueta disponível</p>
         {:else}
           <div style="display: flex; flex-wrap: wrap; gap: 8px;">
             {#each availableLabels as label}
@@ -400,10 +452,10 @@
 
     <!-- Chapter Tags Filter -->
     <div style="margin-top: 10px;">
-      <label style="font-size: 13px; color: var(--muted);">Filtrar por Chapter Tags</label>
+      <label style="font-size: 13px; color: var(--muted);">Filtrar por etiquetas de capítulo</label>
       <div style="margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 120px; overflow-y: auto; background: white;">
         {#if availableChapterTags.length === 0}
-          <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma tag disponível</p>
+          <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma etiqueta de capítulo disponível</p>
         {:else}
           <div style="display: flex; flex-wrap: wrap; gap: 8px;">
             {#each availableChapterTags as tag}
@@ -463,7 +515,7 @@
                   style="width:16px; height:16px;"
                 />
                 <span style={badgeStyle("type", q.type)}>{typeLabel(q.type)}</span>
-                <span style={badgeStyle("source", q.source)}>{q.source}</span>
+                <span style={badgeStyle("source", q.source)}>{sourceLabel(q.source)}</span>
                 <span style={badgeStyle("difficulty", q.difficulty)}>{difficultyLabel(q.difficulty)}</span>
                 {#if q.usageCount > 0}
                   <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid var(--border); background:#fef3c7; border-color:#fde047;">

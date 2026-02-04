@@ -26,6 +26,13 @@
     4: "#fef2f2"
   };
 
+  const TYPE_LABELS = {
+    MULTIPLE_CHOICE: "Escolha múltipla",
+    TRUE_FALSE: "V/F",
+    SHORT_ANSWER: "Resposta curta",
+    OPEN: "Aberta"
+  };
+
   onMount(loadStats);
 
   async function loadStats() {
@@ -83,7 +90,7 @@
 </script>
 
 <div style="max-width: 1400px;">
-  <h1 style="margin: 0 0 24px 0; font-size: 28px; font-weight: 600;">Dashboard</h1>
+  <h1 style="margin: 0 0 24px 0; font-size: 28px; font-weight: 600;">Painel</h1>
 
   {#if loading}
     <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 40px; text-align: center;">
@@ -103,12 +110,12 @@
       </div>
 
       <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
-        <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Labels</div>
+        <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Etiquetas</div>
         <div style="font-size: 32px; font-weight: 600; color: #7c3aed;">{stats.totalLabels}</div>
       </div>
 
       <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
-        <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Chapter Tags</div>
+        <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Etiquetas de capítulo</div>
         <div style="font-size: 32px; font-weight: 600; color: #ea580c;">{stats.totalChapterTags}</div>
       </div>
     </div>
@@ -139,7 +146,7 @@
 
       <!-- Most Used Questions -->
       <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
-        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">Questões Mais Usadas</h3>
+        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">Questões mais usadas</h3>
         
         {#if stats.mostUsedQuestions.length === 0}
           <p style="color: var(--muted); margin: 0; font-size: 14px;">Nenhuma questão foi usada ainda.</p>
@@ -156,7 +163,7 @@
                   </span>
                 </div>
                 <div style="font-size: 12px; color: var(--muted);">
-                  {q.type} • Dificuldade {q.difficulty}
+                  {TYPE_LABELS[q.type] || q.type} • Dificuldade {q.difficulty}
                 </div>
               </div>
             {/each}
@@ -167,7 +174,7 @@
 
     <!-- Quick Actions -->
     <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
-      <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">Acções Rápidas</h3>
+      <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">Ações rápidas</h3>
       
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
         <a href="/app/banks" class="action-btn">

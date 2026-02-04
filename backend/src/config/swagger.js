@@ -458,6 +458,78 @@ export const swaggerSpec = {
         },
       },
     },
+    "/banks/import": {
+      post: {
+        summary: "Importar um novo banco",
+        description: "Cria um novo banco a partir de um ficheiro em formato aiken, gift ou moodle (XML).",
+        tags: ["Bancos de Questões"],
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["title", "format", "content"],
+                properties: {
+                  title: {
+                    type: "string",
+                    description: "Título do novo banco",
+                    example: "Banco importado",
+                  },
+                  format: {
+                    type: "string",
+                    enum: ["aiken", "gift", "moodle"],
+                    description: "Formato do ficheiro",
+                  },
+                  content: {
+                    type: "string",
+                    description: "Conteúdo completo do ficheiro",
+                  },
+                  description: { type: "string" },
+                  language: { type: "string", example: "pt-PT" },
+                  discipline: { type: "string" },
+                  academicYear: { type: "string" },
+                  tags: {
+                    type: "array",
+                    items: { type: "string" },
+                  },
+                  labels: {
+                    type: "array",
+                    items: { type: "string" },
+                  },
+                  chapterTags: {
+                    type: "array",
+                    items: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          200: {
+            description: "Banco importado",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    bankId: { type: "string" },
+                    imported: { type: "integer" },
+                    skipped: { type: "integer" },
+                    createdLabels: { type: "integer" },
+                    createdChapterTags: { type: "integer" },
+                  },
+                },
+              },
+            },
+          },
+          400: { description: "Formato ou conteúdo inválido" },
+          403: { description: "Sem permissão" },
+        },
+      },
+    },
     "/questions": {
       get: {
         summary: "Listar questões (pode ser filtrado por banco)",

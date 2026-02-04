@@ -30,7 +30,7 @@
       const { data } = await api.get(`/labels${params}`);
       labels = Array.isArray(data) ? data : [];
     } catch (e) {
-      error = e?.response?.data?.error || "Erro ao carregar labels";
+      error = e?.response?.data?.error || "Erro ao carregar etiquetas";
     } finally {
       loading = false;
     }
@@ -80,7 +80,7 @@
       cancelForm();
       await loadLabels();
     } catch (e) {
-      formError = e?.response?.data?.error || "Erro ao guardar label";
+      formError = e?.response?.data?.error || "Erro ao guardar etiqueta";
     } finally {
       formLoading = false;
     }
@@ -91,7 +91,7 @@
       await api.put(`/labels/${label._id}`, { isActive: !label.isActive });
       await loadLabels();
     } catch (e) {
-      error = e?.response?.data?.error || "Erro ao atualizar label";
+      error = e?.response?.data?.error || "Erro ao atualizar etiqueta";
     }
   }
 
@@ -114,7 +114,7 @@
       labelToDelete = null;
       await loadLabels();
     } catch (e) {
-      error = e?.response?.data?.error || "Erro ao eliminar label";
+      error = e?.response?.data?.error || "Erro ao eliminar etiqueta";
       showDeleteModal = false;
     }
   }
@@ -127,13 +127,13 @@
   <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px;">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
       <div>
-        <h2 style="margin: 0;">Gestão de Labels</h2>
+        <h2 style="margin: 0;">Gestão de etiquetas</h2>
         <p style="margin: 6px 0 0; color: var(--muted); font-size: 14px;">
-          Cria e gere labels para organizar questões (ex: "Época Normal", "Exame Final")
+          Cria e gere etiquetas para organizar questões (ex.: "Época Normal", "Exame Final")
         </p>
       </div>
       <button class="btn" on:click={startCreate} disabled={isCreating || editingId}>
-        + Nova Label
+        + Nova etiqueta
       </button>
     </div>
 
@@ -155,12 +155,12 @@
   <!-- Create/Edit Form -->
   {#if isCreating || editingId}
     <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px;">
-      <h3 style="margin: 0 0 16px 0;">{editingId ? "Editar Label" : "Nova Label"}</h3>
+      <h3 style="margin: 0 0 16px 0;">{editingId ? "Editar etiqueta" : "Nova etiqueta"}</h3>
 
       <form on:submit|preventDefault={submitForm}>
         <div style="margin-bottom: 16px;">
           <label style="font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px;">
-            Nome da Label
+            Nome da etiqueta
           </label>
           <input
             bind:value={formName}
@@ -192,13 +192,13 @@
   <!-- List -->
   <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
     <h3 style="margin: 0 0 16px 0;">
-      Labels ({filteredLabels.length})
+      Etiquetas ({filteredLabels.length})
     </h3>
 
     {#if loading}
       <p style="color: var(--muted); margin: 0;">A carregar...</p>
     {:else if filteredLabels.length === 0}
-      <p style="color: var(--muted); margin: 0;">Nenhuma label encontrada.</p>
+      <p style="color: var(--muted); margin: 0;">Nenhuma etiqueta encontrada.</p>
     {:else}
       <div style="display: grid; gap: 12px;">
         {#each filteredLabels as label}
@@ -261,9 +261,9 @@
 {#if showDeleteModal && labelToDelete}
   <div class="modal-overlay" on:click={closeDeleteModal}>
     <div class="modal-content" on:click|stopPropagation>
-      <h3 style="margin: 0 0 16px 0; font-size: 18px;">Desativar Label</h3>
+      <h3 style="margin: 0 0 16px 0; font-size: 18px;">Desativar etiqueta</h3>
       <p style="margin: 0 0 24px 0; color: var(--muted); line-height: 1.5;">
-        Tem a certeza que deseja desativar a label <strong style="color: var(--text);">"{labelToDelete.name}"</strong>?
+        Tem a certeza que deseja desativar a etiqueta <strong style="color: var(--text);">"{labelToDelete.name}"</strong>?
       </p>
       <div style="display: flex; gap: 12px; justify-content: flex-end;">
         <button class="btn" type="button" on:click={closeDeleteModal}>

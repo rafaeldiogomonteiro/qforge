@@ -7,6 +7,7 @@ import {
   updateBank,
   deleteBank,
   exportBank,
+  importBank,
 } from "../controllers/QuestionBankController.js";
 
 const router = express.Router();
@@ -16,6 +17,10 @@ router.use(authMiddleware);
 
 router.get("/", listMyBanks);
 router.post("/", createBank);
+
+// Importação de novo banco (colocado antes das rotas com :id para evitar conflito)
+router.post("/import", importBank);
+
 router.get("/:id", getBankById);
 router.put("/:id", updateBank);
 router.delete("/:id", deleteBank);

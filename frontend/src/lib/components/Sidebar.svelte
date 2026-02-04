@@ -4,11 +4,11 @@
   import { currentUser } from "$lib/stores/user";
   
   const menuItems = [
-    { href: "/app", label: "Dashboard", icon: "📊" },
+    { href: "/app", label: "Painel", icon: "📊" },
     { href: "/app/banks", label: "Bancos de Questões", icon: "🗂️" },
     { href: "/app/generate", label: "Gerar com IA", icon: "🤖" },
-    { href: "/app/labels", label: "Labels", icon: "🏷️" },
-    { href: "/app/chapter-tags", label: "Chapter Tags", icon: "📚" }
+    { href: "/app/labels", label: "Etiquetas", icon: "🏷️" },
+    { href: "/app/chapter-tags", label: "Etiquetas de capítulo", icon: "📚" }
   ];
 
   $: currentPath = $page.url.pathname;

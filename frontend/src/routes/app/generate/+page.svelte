@@ -151,12 +151,20 @@
     }[type] || type;
   }
 
+  function sourceLabel(source) {
+    return {
+      MANUAL: "Manual",
+      AI: "IA",
+      IMPORTED: "Importada"
+    }[source] || source;
+  }
+
   function validate() {
     if (!topic.trim() && !content.trim()) {
-      return "Indica pelo menos um 'topic' ou 'content' para gerar.";
+      return "Indica pelo menos um tema ou conteúdo para gerar.";
     }
     if (numQuestions < 1 || numQuestions > 50) {
-      return "numQuestions deve estar entre 1 e 50.";
+      return "O número de questões deve estar entre 1 e 50.";
     }
     return null;
   }
@@ -262,9 +270,9 @@
 
 <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px;">
   <div>
-    <h2 style="margin:0;">Geração de Questões (IA)</h2>
+    <h2 style="margin:0;">Geração de questões (IA)</h2>
     <p style="margin:6px 0 0; color: var(--muted);">
-      Gera questões por topic/content, com tipos e dificuldades configuráveis.
+      Gera questões por tema/conteúdo, com tipos e dificuldades configuráveis.
     </p>
   </div>
 </div>
@@ -296,7 +304,7 @@
       </div>
 
       <div>
-        <label style="font-size: 13px; color: var(--muted);">Topic</label>
+        <label style="font-size: 13px; color: var(--muted);">Tema</label>
         <input
           bind:value={topic}
           placeholder="ex.: Programação Linear — Método Simplex"
@@ -305,7 +313,7 @@
       </div>
 
       <div>
-        <label style="font-size: 13px; color: var(--muted);">Content (opcional)</label>
+        <label style="font-size: 13px; color: var(--muted);">Conteúdo (opcional)</label>
         <textarea
           bind:value={content}
           rows="4"
@@ -456,7 +464,7 @@
         </div>
       </div>
 
-      <!-- Labels -->
+      <!-- Etiquetas -->
       <div>
         <button
           type="button"
@@ -464,14 +472,14 @@
           on:click={() => (showLabelsBox = !showLabelsBox)}
           style="width: 100%; justify-content: space-between; display: flex; align-items: center;"
         >
-          <span>Labels (opcional){#if selectedLabels.length > 0} — {selectedLabels.length} selecionada(s){/if}</span>
+          <span>Etiquetas (opcional){#if selectedLabels.length > 0} — {selectedLabels.length} selecionada(s){/if}</span>
           <span style="font-size: 12px; color: var(--muted);">{showLabelsBox ? "Esconder ▲" : "Mostrar ▼"}</span>
         </button>
 
         {#if showLabelsBox}
           <div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px; max-height: 180px; overflow-y: auto; background: white; margin-top: 6px;">
             {#if availableLabels.length === 0}
-              <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma label disponível. <a href="/app/labels" style="color: #1d4ed8;">Criar labels</a></p>
+              <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma etiqueta disponível. <a href="/app/labels" style="color: #1d4ed8;">Criar etiquetas</a></p>
             {:else}
               <div style="display: grid; gap: 8px;">
                 {#each availableLabels as label}
@@ -500,7 +508,7 @@
         {/if}
       </div>
 
-      <!-- Chapter Tags -->
+      <!-- Etiquetas de capítulo -->
       <div>
         <button
           type="button"
@@ -508,14 +516,14 @@
           on:click={() => (showChapterTagsBox = !showChapterTagsBox)}
           style="width: 100%; justify-content: space-between; display: flex; align-items: center;"
         >
-          <span>Chapter Tags (opcional){#if selectedChapterTags.length > 0} — {selectedChapterTags.length} selecionada(s){/if}</span>
+          <span>Etiquetas de capítulo (opcional){#if selectedChapterTags.length > 0} — {selectedChapterTags.length} selecionada(s){/if}</span>
           <span style="font-size: 12px; color: var(--muted);">{showChapterTagsBox ? "Esconder ▲" : "Mostrar ▼"}</span>
         </button>
 
         {#if showChapterTagsBox}
           <div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px; max-height: 180px; overflow-y: auto; background: white; margin-top: 6px;">
             {#if availableChapterTags.length === 0}
-              <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma tag disponível. <a href="/app/chapter-tags" style="color: #7c3aed;">Criar tags</a></p>
+              <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma etiqueta de capítulo disponível. <a href="/app/chapter-tags" style="color: #7c3aed;">Criar etiquetas</a></p>
             {:else}
               <div style="display: grid; gap: 8px;">
                 {#each availableChapterTags as tag}
@@ -579,7 +587,7 @@
           <div style="border:1px solid var(--border); border-radius:12px; padding:14px;">
             <div style="display:flex; justify-content:space-between; gap: 12px;">
               <div style="font-weight:600;">{typeLabel(q.type)} • D {q.difficulty}/4</div>
-              <div style="font-size:13px; color: var(--muted);">{q.source || "AI"}</div>
+              <div style="font-size:13px; color: var(--muted);">{sourceLabel(q.source || "AI")}</div>
             </div>
 
             <div style="margin-top:8px;">{q.stem}</div>
@@ -605,7 +613,7 @@
 
       <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
         <button class="btn btn-confirm" type="button" on:click={openSaveToBankModal}>
-          💾 Guardar no Banco
+          💾 Guardar no banco
         </button>
       </div>
     {/if}
@@ -643,7 +651,7 @@
 {#if showSaveToBankModal}
   <div class="modal-overlay" on:click={closeSaveToBankModal}>
     <div class="modal-content" on:click|stopPropagation>
-      <h3 style="margin: 0 0 16px 0; font-size: 18px;">Guardar no Banco</h3>
+      <h3 style="margin: 0 0 16px 0; font-size: 18px;">Guardar no banco</h3>
       <p style="margin: 0 0 12px 0; color: var(--muted); line-height: 1.5;">
         Seleciona o banco onde pretendes guardar as {generated.length} {generated.length === 1 ? 'questão' : 'questões'}:
       </p>

@@ -1,5 +1,8 @@
 import QuestionBank from "../models/QuestionBank.js";
 import Question from "../models/Question.js";
+import Label from "../models/Label.js";
+import ChapterTag from "../models/ChapterTag.js";
+import { XMLParser } from "fast-xml-parser";
 
 // POST /banks
 export async function createBank(req, res) {
@@ -470,5 +473,350 @@ export async function exportBank(req, res) {
   } catch (err) {
     console.error("Erro em exportBank:", err);
     res.status(500).json({ error: "Erro no servidor" });
+  }
+}
+
+function clampDifficulty(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return 2;
+  if (num < 1) return 1;
+  if (num > 4) return 4;
+  return num;
+}
+
+function stripHtml(value = "") {
+  return String(value).replace(/<[^>]*>/g, "").trim();
+}
+
+async function upsertLabelsFromNames(names, ownerId) {
+  const cleaned = [...new Set((names || []).map((n) => String(n || "").trim()).filter(Boolean))];
+  const ids = [];
+
+  for (const name of cleaned) {
+    const normalizedName = name.toLowerCase();
+    const label = await Label.findOneAndUpdate(
+      { owner: ownerId, normalizedName },
+      {
+        $setOnInsert: {
+          name,
+          normalizedName,
+          isActive: true,
+          owner: ownerId,
+        },
+      },
+      { new: true, upsert: true }
+    );
+    if (label.isActive === false) {
+      label.isActive = true;
+      await label.save();
+    }
+    ids.push(label._id);
+  }
+
+  return ids;
+}
+
+async function upsertChapterTagsFromNames(names, ownerId) {
+  const cleaned = [...new Set((names || []).map((n) => String(n || "").trim()).filter(Boolean))];
+  const ids = [];
+
+  for (const name of cleaned) {
+    const normalizedName = name.toLowerCase();
+    const tag = await ChapterTag.findOneAndUpdate(
+      { owner: ownerId, normalizedName },
+      {
+        $setOnInsert: {
+          name,
+          normalizedName,
+          isActive: true,
+          owner: ownerId,
+        },
+      },
+      { new: true, upsert: true }
+    );
+    if (tag.isActive === false) {
+      tag.isActive = true;
+      await tag.save();
+    }
+    ids.push(tag._id);
+  }
+
+  return ids;
+}
+
+function normalizeToStringArray(value) {
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v || "").trim()).filter(Boolean);
+  }
+  return String(value || "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+function parseQuestionsFromAiken(content) {
+  const blocks = String(content)
+    .split(/\r?\n\s*\r?\n/)
+    .map((b) => b.trim())
+    .filter(Boolean);
+
+  const questions = [];
+
+  for (const block of blocks) {
+    const lines = block
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    if (lines.length < 3) continue;
+
+    const stem = lines[0];
+    const answerLine = lines.find((l) => /^ANSWER\s*:/i.test(l));
+    const optionLines = lines.filter((l) => /^[A-Z][\.|\)]\s+/i.test(l));
+
+    if (!answerLine || optionLines.length < 2) continue;
+
+    const correctLetter = answerLine.replace(/^ANSWER\s*:/i, "").trim().toUpperCase();
+
+    const options = optionLines.map((l, idx) => {
+      const letter = l.slice(0, 1).toUpperCase();
+      const text = l.replace(/^[A-Z][\.|\)]\s+/i, "").trim();
+      return { text, isCorrect: letter === correctLetter || (correctLetter === "" && idx === 0) };
+    });
+
+    if (!options.some((o) => o.isCorrect)) {
+      options[0].isCorrect = true;
+    }
+
+    questions.push({
+      type: "MULTIPLE_CHOICE",
+      stem,
+      options,
+      acceptableAnswers: [],
+      difficulty: 2,
+    });
+  }
+
+  return questions;
+}
+
+function parseQuestionsFromGift(content) {
+  const regex = /(?:::[^:]+::)?\s*(?<stem>[^\{]+?)\s*\{(?<answers>[^}]*)\}/gms;
+  const questions = [];
+
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    const stem = String(match.groups?.stem || "").trim();
+    const answersRaw = match.groups?.answers || "";
+    const answerTokens = answersRaw
+      .split(/\r?\n|(?==)|(?=~)/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const options = [];
+    for (const token of answerTokens) {
+      const prefix = token[0];
+      if (prefix !== "=" && prefix !== "~") continue;
+      const text = token.slice(1).trim();
+      if (!text) continue;
+      options.push({ text, isCorrect: prefix === "=" });
+    }
+
+    if (!stem || options.length < 2) continue;
+    if (!options.some((o) => o.isCorrect)) options[0].isCorrect = true;
+
+    questions.push({
+      type: "MULTIPLE_CHOICE",
+      stem,
+      options,
+      acceptableAnswers: [],
+      difficulty: 2,
+    });
+  }
+
+  return questions;
+}
+
+function parseQuestionsFromMoodleXml(content) {
+  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "" });
+  const parsed = parser.parse(content);
+  const rawQuestions = parsed?.quiz?.question || [];
+  const arr = Array.isArray(rawQuestions) ? rawQuestions : [rawQuestions];
+
+  const questions = [];
+
+  for (const q of arr) {
+    if (!q) continue;
+    const qType = String(q.type || "").toLowerCase();
+    const stem = stripHtml(q.questiontext?.text || q.questiontext || "");
+    if (!stem) continue;
+
+    if (qType === "multichoice") {
+      const answers = Array.isArray(q.answer) ? q.answer : q.answer ? [q.answer] : [];
+      const options = answers
+        .map((a) => ({ text: stripHtml(a?.text || ""), isCorrect: Number(a?.fraction || 0) > 0 }))
+        .filter((o) => o.text);
+      if (!options.some((o) => o.isCorrect) && options.length > 0) options[0].isCorrect = true;
+      questions.push({ type: "MULTIPLE_CHOICE", stem, options, acceptableAnswers: [], difficulty: 2 });
+      continue;
+    }
+
+    if (qType === "truefalse") {
+      const answers = Array.isArray(q.answer) ? q.answer : q.answer ? [q.answer] : [];
+      let correctIsTrue = true;
+      const trueAns = answers.find((a) => /^true$/i.test(stripHtml(a?.text || "")) && Number(a?.fraction || 0) > 0);
+      const falseAns = answers.find((a) => /^false$/i.test(stripHtml(a?.text || "")) && Number(a?.fraction || 0) > 0);
+      if (trueAns && !falseAns) correctIsTrue = true;
+      if (falseAns && !trueAns) correctIsTrue = false;
+      const options = [
+        { text: "Verdadeiro", isCorrect: correctIsTrue },
+        { text: "Falso", isCorrect: !correctIsTrue },
+      ];
+      questions.push({ type: "TRUE_FALSE", stem, options, acceptableAnswers: [], difficulty: 2 });
+      continue;
+    }
+
+    if (qType === "shortanswer") {
+      const answers = Array.isArray(q.answer) ? q.answer : q.answer ? [q.answer] : [];
+      const acceptableAnswers = answers.map((a) => stripHtml(a?.text || "")).filter(Boolean);
+      if (acceptableAnswers.length === 0) continue;
+      questions.push({ type: "SHORT_ANSWER", stem, options: [], acceptableAnswers, difficulty: 2 });
+      continue;
+    }
+
+    if (qType === "essay") {
+      questions.push({ type: "OPEN", stem, options: [], acceptableAnswers: [], difficulty: 2 });
+      continue;
+    }
+  }
+
+  return questions;
+}
+
+function buildQuestionDocs(parsedQuestions, bankId, userId, labelIds = [], chapterTagIds = []) {
+  const docs = [];
+  let skipped = 0;
+
+  for (const q of parsedQuestions) {
+    const type = String(q.type || "MULTIPLE_CHOICE").toUpperCase();
+    const stem = String(q.stem || "").trim();
+    if (!stem) {
+      skipped += 1;
+      continue;
+    }
+
+    const doc = {
+      bank: bankId,
+      type,
+      stem,
+      options: Array.isArray(q.options)
+        ? q.options.map((o) => ({
+            text: String(o?.text || "").trim(),
+            isCorrect: Boolean(o?.isCorrect),
+          }))
+        : [],
+      acceptableAnswers: Array.isArray(q.acceptableAnswers)
+        ? q.acceptableAnswers.map((a) => String(a || "").trim()).filter(Boolean)
+        : [],
+      difficulty: clampDifficulty(q.difficulty ?? 2),
+      tags: Array.isArray(q.tags) ? q.tags.map((t) => String(t || "").trim()).filter(Boolean) : [],
+      chapterTags: chapterTagIds,
+      labels: labelIds,
+      source: "IMPORTED",
+      createdBy: userId,
+    };
+
+    if (type === "MULTIPLE_CHOICE" || type === "TRUE_FALSE") {
+      doc.options = doc.options.filter((o) => o.text);
+      if (doc.options.length < 2 || !doc.options.some((o) => o.isCorrect)) {
+        skipped += 1;
+        continue;
+      }
+    }
+
+    if (type === "SHORT_ANSWER" && doc.acceptableAnswers.length === 0) {
+      skipped += 1;
+      continue;
+    }
+
+    docs.push(doc);
+  }
+
+  return { docs, skipped };
+}
+
+export async function importBank(req, res) {
+  try {
+    const {
+      format,
+      content,
+      title,
+      description,
+      language,
+      discipline,
+      academicYear,
+      tags,
+      labels,
+      chapterTags,
+    } = req.body || {};
+
+    const trimmedTitle = String(title || "").trim();
+
+    if (!format || !content || !trimmedTitle) {
+      return res.status(400).json({ error: "'title', 'format' e 'content' são obrigatórios" });
+    }
+
+    const fmt = String(format).toLowerCase();
+    let parsed = [];
+
+    if (fmt === "aiken") parsed = parseQuestionsFromAiken(content);
+    else if (fmt === "gift") parsed = parseQuestionsFromGift(content);
+    else if (fmt === "moodle") parsed = parseQuestionsFromMoodleXml(content);
+    else {
+      return res.status(400).json({ error: "Formato inválido. Use aiken, gift ou moodle" });
+    }
+
+    const { docs, skipped } = buildQuestionDocs(parsed, null, req.userId);
+
+    if (docs.length === 0) {
+      return res.status(400).json({ error: "Nenhuma questão válida encontrada no ficheiro" });
+    }
+
+    const tagsList = normalizeToStringArray(tags);
+    const labelNames = normalizeToStringArray(labels);
+    const chapterTagNames = normalizeToStringArray(chapterTags);
+
+    const bank = await QuestionBank.create({
+      title: trimmedTitle,
+      description,
+      language: language || "pt-PT",
+      discipline,
+      academicYear,
+      owner: req.userId,
+      tags: tagsList,
+    });
+
+    const labelIds = await upsertLabelsFromNames(labelNames, req.userId);
+    const chapterTagIds = await upsertChapterTagsFromNames(chapterTagNames, req.userId);
+
+    const docsWithIds = docs.map((doc) => ({
+      ...doc,
+      bank: bank._id,
+      labels: labelIds,
+      chapterTags: chapterTagIds,
+    }));
+
+    const created = await Question.insertMany(docsWithIds, { ordered: false });
+
+    res.json({
+      bankId: bank._id,
+      imported: created.length,
+      skipped,
+      createdLabels: labelIds.length,
+      createdChapterTags: chapterTagIds.length,
+    });
+  } catch (err) {
+    console.error("Erro em importBank:", err);
+    res.status(500).json({ error: err.message || "Erro ao importar" });
   }
 }

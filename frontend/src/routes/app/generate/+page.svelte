@@ -134,6 +134,13 @@
       banks = banksRes.data?.data ?? [];
       availableLabels = labelsRes.data || [];
       availableChapterTags = chapterTagsRes.data || [];
+
+      // Se o bankId guardado não está na lista atual (pode ter sido de outra conta ou removido), limpa-o para evitar 403 inesperados
+      const bankStillExists = banks.some((b) => String(b._id) === String(bankId));
+      if (bankId && !bankStillExists) {
+        bankId = "";
+        selectedBankForSave = "";
+      }
     } catch (e) {
       // não bloqueia a página
       banks = [];

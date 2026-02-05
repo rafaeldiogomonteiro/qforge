@@ -128,7 +128,16 @@ export async function createQuestion(req, res) {
       return res.status(404).json({ error: "Banco de questões não encontrado" });
     }
 
-    if (String(bank.owner) !== String(req.userId)) {
+    const userId = String(req.userId);
+    const isOwner = String(bank.owner) === userId;
+    const isCoordinator = Array.isArray(bank.coordinators)
+      ? bank.coordinators.map(String).includes(userId)
+      : false;
+    const isShared = Array.isArray(bank.sharedWith)
+      ? bank.sharedWith.map(String).includes(userId)
+      : false;
+
+    if (!isOwner && !isCoordinator && !isShared) {
       return res
         .status(403)
         .json({ error: "Não tens permissão para adicionar questões a este banco" });
@@ -232,7 +241,16 @@ export async function listQuestionsForBank(req, res) {
       return res.status(404).json({ error: "Banco de questões não encontrado" });
     }
 
-    if (String(bank.owner) !== String(req.userId)) {
+    const userId = String(req.userId);
+    const isOwner = String(bank.owner) === userId;
+    const isCoordinator = Array.isArray(bank.coordinators)
+      ? bank.coordinators.map(String).includes(userId)
+      : false;
+    const isShared = Array.isArray(bank.sharedWith)
+      ? bank.sharedWith.map(String).includes(userId)
+      : false;
+
+    if (!isOwner && !isCoordinator && !isShared) {
       return res
         .status(403)
         .json({ error: "Não tens permissão para ver as questões deste banco" });

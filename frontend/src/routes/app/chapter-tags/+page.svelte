@@ -471,7 +471,7 @@
           <input
             value={folderForm.name}
             on:input={(e) => (folderForm.name = e.target.value)}
-            placeholder="ex: Finanças"
+            placeholder="ex: Programação I"
             disabled={folderFormLoading}
             style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 10px;"
           />

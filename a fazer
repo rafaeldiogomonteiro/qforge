@@ -1,0 +1,12 @@
+Etiquetas não dão para eliminar, só para desativar
+Mover etiquetas de uma pasta para outra, e não apenas de Sem pasta
+Criar botão de mostra etiquetas inativas, e o botão de mostrar inativas ser apenas para as pastas 
+Trocar emoji de etiquetas de capitulo, mudar nome de etiquetas de capitulo para capítulos
+Impossível Eliminar etiquetas 
+Editar banco de questões
+As etiquetas de capitulo quando se pretende gerar umas questão devem estar organizadas nas mesmas pelas pastas
+http://localhost:5173/app/banks/ aparece o id do banco, retirar para user comum
+A mostrar 0 de 0 questões. Selecionar estas Limpar seleção  deve estar numa caixa aparte mais abaixo
+
+Quando escolhidos capítulos na geração através de IA, a prompt deve se reger aquelas capítulos
+

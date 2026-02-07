@@ -23,7 +23,16 @@ export const isAuthed = derived(authToken, ($token) => Boolean($token));
 export function logout() {
   authToken.set(null);
   if (browser) {
+    // Limpa tokens e rascunhos locais ao terminar sessão
     localStorage.removeItem(TOKEN_KEY);
+
+    const draftPrefixes = ["question-draft-", "ai-generate-draft"];
+    for (const key of Object.keys(localStorage)) {
+      if (draftPrefixes.some((p) => key.startsWith(p))) {
+        localStorage.removeItem(key);
+      }
+    }
+
     // força nova navegação para limpar estado da app
     window.location.href = "/login";
   }

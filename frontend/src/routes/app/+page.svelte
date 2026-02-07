@@ -115,7 +115,7 @@
       </div>
 
       <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
-        <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Etiquetas de capítulo</div>
+        <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Capítulos</div>
         <div style="font-size: 32px; font-weight: 600; color: #ea580c;">{stats.totalChapterTags}</div>
       </div>
     </div>

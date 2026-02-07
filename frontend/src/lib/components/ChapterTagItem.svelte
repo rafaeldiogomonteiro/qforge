@@ -20,7 +20,7 @@
 >
   <div style="flex: 1;">
     <div style="font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px;">
-      <span style="color: var(--muted);">🏷️</span>
+      <span style="color: var(--muted);">📌</span>
       {tag.name}
     </div>
     {#if !tag.isActive}
@@ -35,10 +35,17 @@
       </button>
       <button
         class="btn btn-delete"
-        on:click={() => onDelete(tag)}
+        on:click={() => onDelete(tag, "deactivate")}
         title="Desativar etiqueta"
       >
         Desativar
+      </button>
+      <button
+        class="btn btn-delete"
+        on:click={() => onDelete(tag, "delete")}
+        title="Eliminar etiqueta"
+      >
+        Eliminar
       </button>
     {:else}
       <button
@@ -47,6 +54,13 @@
         title="Reativar etiqueta"
       >
         Reativar
+      </button>
+      <button
+        class="btn btn-delete"
+        on:click={() => onDelete(tag, "delete")}
+        title="Eliminar etiqueta"
+      >
+        Eliminar
       </button>
     {/if}
   </div>

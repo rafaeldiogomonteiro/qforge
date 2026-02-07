@@ -19,6 +19,7 @@
   // Confirmation modal
   let showDeleteModal = false;
   let labelToDelete = null;
+  let deleteMode = "deactivate"; // deactivate | delete
 
   onMount(loadLabels);
 
@@ -95,9 +96,10 @@
     }
   }
 
-  function openDeleteModal(label) {
+  function openDeleteModal(label, mode = "deactivate") {
     labelToDelete = label;
     showDeleteModal = true;
+    deleteMode = mode;
   }
   
   function closeDeleteModal() {
@@ -109,7 +111,11 @@
     if (!labelToDelete) return;
     
     try {
-      await api.delete(`/labels/${labelToDelete._id}`);
+      const url = deleteMode === "delete"
+        ? `/labels/${labelToDelete._id}?force=1`
+        : `/labels/${labelToDelete._id}`;
+
+      await api.delete(url);
       showDeleteModal = false;
       labelToDelete = null;
       await loadLabels();
@@ -235,10 +241,17 @@
                 </button>
                 <button
                   class="btn"
-                  on:click={() => openDeleteModal(label)}
+                  on:click={() => openDeleteModal(label, "deactivate")}
                   style="padding: 8px 12px; font-size: 13px; background: #fef2f2; border-color: #fecaca; color: #b91c1c;"
                 >
                   Desativar
+                </button>
+                <button
+                  class="btn btn-delete"
+                  on:click={() => openDeleteModal(label, "delete")}
+                  style="padding: 8px 12px; font-size: 13px;"
+                >
+                  Eliminar
                 </button>
               {:else}
                 <button
@@ -247,6 +260,13 @@
                   style="padding: 8px 12px; font-size: 13px; background: #ecfdf5; border-color: #bbf7d0; color: #166534;"
                 >
                   Reativar
+                </button>
+                <button
+                  class="btn btn-delete"
+                  on:click={() => openDeleteModal(label, "delete")}
+                  style="padding: 8px 12px; font-size: 13px;"
+                >
+                  Eliminar
                 </button>
               {/if}
             </div>
@@ -261,16 +281,35 @@
 {#if showDeleteModal && labelToDelete}
   <div class="modal-overlay" on:click={closeDeleteModal}>
     <div class="modal-content" on:click|stopPropagation>
-      <h3 style="margin: 0 0 16px 0; font-size: 18px;">Desativar etiqueta</h3>
-      <p style="margin: 0 0 24px 0; color: var(--muted); line-height: 1.5;">
-        Tem a certeza que deseja desativar a etiqueta <strong style="color: var(--text);">"{labelToDelete.name}"</strong>?
+      <h3 style="margin: 0 0 14px 0; font-size: 18px;">Gestão da etiqueta</h3>
+      <p style="margin: 0 0 14px 0; color: var(--muted); line-height: 1.5;">
+        O que pretendes fazer com <strong style="color: var(--text);">"{labelToDelete.name}"</strong>?
       </p>
+
+      <div style="display: grid; gap: 8px; margin-bottom: 18px;">
+        <label class="option-row">
+          <input type="radio" name="deleteMode" value="deactivate" bind:group={deleteMode} />
+          <div>
+            <div style="font-weight: 600;">Desativar</div>
+            <div class="option-help">Fica inativa e pode ser reativada depois.</div>
+          </div>
+        </label>
+
+        <label class="option-row">
+          <input type="radio" name="deleteMode" value="delete" bind:group={deleteMode} />
+          <div>
+            <div style="font-weight: 600; color: #b91c1c;">Eliminar definitivamente</div>
+            <div class="option-help">Remove a etiqueta e limpa as referências nas questões.</div>
+          </div>
+        </label>
+      </div>
+
       <div style="display: flex; gap: 12px; justify-content: flex-end;">
         <button class="btn" type="button" on:click={closeDeleteModal}>
           Cancelar
         </button>
         <button class="btn btn-delete" type="button" on:click={confirmDelete}>
-          Desativar
+          {deleteMode === "delete" ? "Eliminar" : "Desativar"}
         </button>
       </div>
     </div>
@@ -342,5 +381,22 @@
       opacity: 1;
       transform: scale(1);
     }
+  }
+
+  .option-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #f9fafb;
+  }
+
+  .option-help {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 2px;
   }
 </style>

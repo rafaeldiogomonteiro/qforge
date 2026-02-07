@@ -1,4 +1,5 @@
 import Label from "../models/Label.js";
+import Question from "../models/Question.js";
 
 function normalizeName(name) {
   return String(name || "").trim();
@@ -108,10 +109,26 @@ export async function updateLabel(req, res) {
 export async function deleteLabel(req, res) {
   try {
     const { id } = req.params;
+    const forceDelete = ["1", "true", "yes"].includes(
+      String(req.query.force || req.query.permanent || "").toLowerCase()
+    );
 
     const label = await Label.findOne({ _id: id, owner: req.userId });
     if (!label) {
       return res.status(404).json({ error: "Label não encontrada" });
+    }
+
+    // Remoção definitiva (opcional)
+    if (forceDelete) {
+      await Promise.all([
+        Question.updateMany(
+          { labels: label._id },
+          { $pull: { labels: label._id } }
+        ),
+        Label.deleteOne({ _id: label._id })
+      ]);
+
+      return res.json({ message: "Label eliminada com sucesso" });
     }
 
     label.isActive = false;

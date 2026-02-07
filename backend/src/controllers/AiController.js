@@ -122,10 +122,18 @@ export async function generateQuestionsHandler(req, res) {
 
     // Se saveToBank, guarda as questões no banco
     let savedQuestions = [];
+    const userProvidedChapterTags =
+      Array.isArray(chapterTags) && chapterTags.length > 0 ? chapterTags : [];
+
     if (saveToBank && bank) {
       for (const q of result.questions) {
-        // Usa chapter tags e labels gerados pela IA, ou os fornecidos pelo utilizador como fallback
-        const finalChapterTags = Array.isArray(q.chapterTags) && q.chapterTags.length > 0 ? q.chapterTags : chapterTags;
+        // Capítulos: se o utilizador forneceu, usa-os sempre. Caso contrário, usa os gerados pela IA.
+        const finalChapterTags =
+          userProvidedChapterTags.length > 0
+            ? userProvidedChapterTags
+            : Array.isArray(q.chapterTags) && q.chapterTags.length > 0
+            ? q.chapterTags
+            : [];
         const finalLabels = Array.isArray(q.labels) && q.labels.length > 0 ? q.labels : labels;
 
         console.log(`[AI] Processando chapter tags para questão:`, finalChapterTags);

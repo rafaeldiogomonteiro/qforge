@@ -217,7 +217,7 @@ function buildUserPrompt(params) {
   }
 
   if (chapterTags && chapterTags.length > 0) {
-    prompt += `CAPÍTULOS/TAGS SUGERIDOS: ${chapterTags.join(", ")} (usa estes como referência mas podes adicionar outros relevantes)\n`;
+    prompt += `CAPÍTULOS/TAGS OBRIGATÓRIOS: ${chapterTags.join(", ")}\n`;
   }
 
   if (content) {
@@ -228,8 +228,14 @@ function buildUserPrompt(params) {
 - Tipos de questão: ${typeDescriptions}
 - Níveis de dificuldade: ${difficultyDescriptions}
 - Distribui as questões pelos tipos e dificuldades pedidos
-- Para cada questão, identifica 1-3 chapter tags relevantes (tópicos/conceitos abordados)
+- Para cada questão, identifica 1-3 chapter tags (tópicos/conceitos abordados)
 - Usa nomes descritivos para os chapter tags (ex: "HTML Básico", "CSS Flexbox", "JavaScript Arrays")`;
+
+  if (chapterTags && chapterTags.length > 0) {
+    prompt += `\n- Usa apenas chapter tags da lista fornecida acima; não inventes novos nomes.`;
+  } else {
+    prompt += `\n- Se necessário, sugere chapter tags coerentes com o conteúdo.`;
+  }
 
   if (additionalInstructions) {
     prompt += `\n\nINSTRUÇÕES ADICIONAIS: ${additionalInstructions}`;
@@ -315,6 +321,12 @@ export async function generateQuestions(provider, params) {
       difficulties[idx % difficulties.length] || difficulties[0] || 2;
     const difficulty = clampDifficulty(q.difficulty, fallbackDifficulty);
 
+    const providedChapterTags = asStringArray(chapterTags);
+    const generatedChapterTags = asStringArray(q.chapterTags);
+    // Se o utilizador forneceu chapterTags, usamos exclusivamente esses; caso contrário, ficamos com os gerados (se houver)
+    const finalChapterTags =
+      providedChapterTags.length > 0 ? providedChapterTags : generatedChapterTags;
+
     return {
       type: q.type || types[idx % types.length] || "MULTIPLE_CHOICE",
       stem: q.stem || q.question || "",
@@ -324,7 +336,7 @@ export async function generateQuestions(provider, params) {
         : [],
       difficulty,
       labels: asStringArray(q.labels),
-      chapterTags: asStringArray(q.chapterTags),
+      chapterTags: finalChapterTags,
       explanation: q.explanation || "",
       source: "AI",
     };

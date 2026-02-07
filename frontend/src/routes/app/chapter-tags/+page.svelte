@@ -26,6 +26,7 @@
 
   // Deletes
   let deletingTag = null;
+  let deleteMode = "deactivate"; // deactivate | delete
   let deletingFolder = null;
   let moveFolderContents = false;
 
@@ -121,6 +122,12 @@
   }
 
   $: moveTargetNormalized = moveTagsTargetFolderId ? String(moveTagsTargetFolderId) : "";
+  $: moveFolderOptions = [
+    { _id: "", name: "Sem pasta" },
+    ...groups
+      .filter((g) => g.folder && (showInactive ? true : g.folder.isActive))
+      .map((g) => g.folder),
+  ];
   $: moveCandidates = allTagsFlat()
     .filter((t) => {
       const currentFolder = t.folder ? String(t.folder) : "";
@@ -259,8 +266,9 @@
     }
   }
 
-  function confirmDeleteTag(tag) {
+  function confirmDeleteTag(tag, mode = "deactivate") {
     deletingTag = tag;
+    deleteMode = mode;
   }
 
   function closeDeleteTag() {
@@ -270,7 +278,10 @@
   async function deleteTag() {
     if (!deletingTag) return;
     try {
-      await api.delete(`/chapter-tags/${deletingTag._id}`);
+      const url = deleteMode === "delete"
+        ? `/chapter-tags/${deletingTag._id}?force=1`
+        : `/chapter-tags/${deletingTag._id}`;
+      await api.delete(url);
       deletingTag = null;
       await loadData();
     } catch (e) {
@@ -375,16 +386,20 @@
   <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px; display: grid; gap: 12px;">
     <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start;">
       <div>
-        <h2 style="margin: 0;">Gestão de etiquetas de capítulo</h2>
+        <h2 style="margin: 0;">Gestão de capítulos</h2>
         <p style="margin: 6px 0 0; color: var(--muted); font-size: 14px;">
-          Organiza etiquetas por pastas para navegar mais rápido. Usa pesquisa global ou filtra inativas.
+          Organiza capítulos por pastas para navegar mais rápido. Usa pesquisa global ou filtra inativos.
         </p>
         <div style="margin-top: 8px; color: var(--muted); font-size: 13px; display: flex; gap: 12px;">
           <span>{totalFolders} pastas</span>
-          <span>{totalTags} etiquetas</span>
+          <span>{totalTags} capítulos</span>
         </div>
       </div>
-      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: flex-end;">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; white-space: nowrap;">
+          <input type="checkbox" bind:checked={showInactive} on:change={loadData} />
+          Mostrar pastas/etiquetas inativas
+        </label>
         <button class="btn" on:click={startCreateFolder}>+ Nova pasta</button>
         <button class="btn primary" on:click={() => startCreateTag("")}>+ Nova etiqueta</button>
       </div>
@@ -397,10 +412,6 @@
         on:input={(e) => (searchTerm = e.target.value)}
         style="flex: 1; min-width: 260px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;"
       />
-      <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;">
-        <input type="checkbox" bind:checked={showInactive} on:change={loadData} />
-        Mostrar inativas
-      </label>
     </div>
   </div>
 
@@ -568,9 +579,18 @@
         <button class="btn" on:click={closeMoveTagsModal} disabled={moveTagsLoading}>Fechar</button>
       </div>
 
-      <p style="margin: 8px 0 14px 0; color: var(--muted);">
-        Destino: <strong>{moveTagsTargetFolderId ? selectableFolders.find((f) => String(f._id) === String(moveTagsTargetFolderId))?.name || "(Pasta)" : "Sem pasta"}</strong>
-      </p>
+      <div style="margin: 10px 0 14px 0; display:grid; gap:6px;">
+        <label style="font-size: 13px; color: var(--muted);">Mover para</label>
+        <select
+          bind:value={moveTagsTargetFolderId}
+          disabled={moveTagsLoading}
+          style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:white;"
+        >
+          {#each moveFolderOptions as folder}
+            <option value={folder._id}>{folder.name}</option>
+          {/each}
+        </select>
+      </div>
 
       <input
         placeholder="Procurar etiqueta..."
@@ -648,11 +668,30 @@
     ></button>
 
     <div class="modal-content" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="delete-tag-title">
-      <h3 id="delete-tag-title" style="margin: 0 0 12px 0;">Desativar etiqueta</h3>
-      <p style="margin: 0 0 20px 0; color: var(--muted);">Confirmas desativar "{deletingTag.name}"?</p>
+      <h3 id="delete-tag-title" style="margin: 0 0 12px 0;">Gerir etiqueta</h3>
+      <p style="margin: 0 0 12px 0; color: var(--muted);">O que fazer com "{deletingTag.name}"?</p>
+
+      <div style="display: grid; gap: 8px; margin-bottom: 16px;">
+        <label class="option-row">
+          <input type="radio" name="deleteMode" value="deactivate" bind:group={deleteMode} />
+          <div>
+            <div style="font-weight: 600;">Desativar</div>
+            <div class="option-help">Pode ser reativada mais tarde.</div>
+          </div>
+        </label>
+
+        <label class="option-row">
+          <input type="radio" name="deleteMode" value="delete" bind:group={deleteMode} />
+          <div>
+            <div style="font-weight: 600; color: #b91c1c;">Eliminar definitivamente</div>
+            <div class="option-help">Apaga e remove das questões associadas.</div>
+          </div>
+        </label>
+      </div>
+
       <div style="display: flex; gap: 10px; justify-content: flex-end;">
         <button class="btn" on:click={closeDeleteTag}>Cancelar</button>
-        <button class="btn btn-delete" on:click={deleteTag}>Desativar</button>
+        <button class="btn btn-delete" on:click={deleteTag}>{deleteMode === "delete" ? "Eliminar" : "Desativar"}</button>
       </div>
     </div>
   </div>
@@ -715,9 +754,26 @@
   }
 
   .btn-delete {
-    background: #dc2626;
-    color: white;
-    border-color: #dc2626;
+    background: #dc2626 !important;
+    color: white !important;
+    border-color: #dc2626 !important;
+  }
+
+  .option-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #f9fafb;
+  }
+
+  .option-help {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 2px;
   }
 
   .modal-overlay {

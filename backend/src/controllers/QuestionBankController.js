@@ -158,7 +158,6 @@ export async function updateBank(req, res) {
 export async function deleteBank(req, res) {
   try {
     const { id } = req.params;
-
     const bank = await QuestionBank.findById(id);
 
     if (!bank) {
@@ -171,6 +170,8 @@ export async function deleteBank(req, res) {
         .json({ error: "Não tens permissão para apagar este banco" });
     }
 
+    // Remove questões ligadas e depois o banco
+    await Question.deleteMany({ bank: bank._id });
     await bank.deleteOne();
 
     res.json({ message: "Banco apagado com sucesso" });

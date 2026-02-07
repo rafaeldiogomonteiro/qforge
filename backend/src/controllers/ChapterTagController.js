@@ -1,5 +1,6 @@
 import ChapterTag from "../models/ChapterTag.js";
 import ChapterTagFolder from "../models/ChapterTagFolder.js";
+import Question from "../models/Question.js";
 import { ensurePositions } from "./ChapterTagFolderController.js";
 
 function isValidObjectId(id) {
@@ -196,10 +197,25 @@ export async function updateChapterTag(req, res) {
 export async function deleteChapterTag(req, res) {
   try {
     const { id } = req.params;
+    const forceDelete = ["1", "true", "yes"].includes(
+      String(req.query.force || req.query.permanent || "").toLowerCase()
+    );
 
     const tag = await ChapterTag.findOne({ _id: id, owner: req.userId });
     if (!tag) {
       return res.status(404).json({ error: "Tag não encontrada" });
+    }
+
+    if (forceDelete) {
+      await Promise.all([
+        Question.updateMany(
+          { chapterTags: tag._id },
+          { $pull: { chapterTags: tag._id } }
+        ),
+        ChapterTag.deleteOne({ _id: tag._id })
+      ]);
+
+      return res.json({ message: "Tag eliminada com sucesso" });
     }
 
     tag.isActive = false;

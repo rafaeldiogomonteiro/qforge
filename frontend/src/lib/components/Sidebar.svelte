@@ -8,7 +8,7 @@
     { href: "/app/banks", label: "Bancos de Questões", icon: "🗂️" },
     { href: "/app/generate", label: "Gerar com IA", icon: "🤖" },
     { href: "/app/labels", label: "Etiquetas", icon: "🏷️" },
-    { href: "/app/chapter-tags", label: "Etiquetas de capítulo", icon: "📚" }
+    { href: "/app/chapter-tags", label: "Capítulos", icon: "📚" }
   ];
 
   $: currentPath = $page.url.pathname;

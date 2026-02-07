@@ -240,7 +240,7 @@
             />
           </div>
           <div>
-            <label style="font-size: 13px; color: var(--muted);">Etiquetas de capítulo (opcional)</label>
+          <label style="font-size: 13px; color: var(--muted);">Capítulos (opcional)</label>
             <input
               type="text"
               bind:value={importChapterTags}

@@ -10,14 +10,27 @@
   let error = "";
   let selected = new Set();
 
+  let deletingBank = false;
+  let deleteError = "";
+
   // Available labels and chapter tags for filters
   let availableLabels = [];
   let availableChapterTags = [];
+
+  // Editar banco
+  let editingBank = false;
+  let bankForm = { title: "", description: "", discipline: "", academicYear: "", language: "" };
+  let bankFormError = "";
+  let bankFormLoading = false;
 
   // Export modal
   let showExportModal = false;
   let exportLoading = false;
   let exportError = "";
+
+  // Delete question
+  let deletingQuestion = null;
+  let deleteQuestionError = "";
 
   // filtros
   let fType = "ALL";
@@ -50,10 +63,74 @@
       questions = Array.isArray(qRes.data) ? qRes.data : [];
       availableLabels = labelsRes.data || [];
       availableChapterTags = tagsRes.data || [];
+      bankForm = {
+        title: bank?.title || "",
+        description: bank?.description || "",
+        discipline: bank?.discipline || "",
+        academicYear: bank?.academicYear || "",
+        language: bank?.language || ""
+      };
     } catch (e) {
       error = e?.response?.data?.message || "Erro ao carregar banco.";
     } finally {
       loading = false;
+    }
+  }
+
+  function startEditBank() {
+    if (!bank) return;
+    editingBank = true;
+    bankFormError = "";
+    bankFormLoading = false;
+    bankForm = {
+      title: bank.title || "",
+      description: bank.description || "",
+      discipline: bank.discipline || "",
+      academicYear: bank.academicYear || "",
+      language: bank.language || "",
+    };
+  }
+
+  function cancelEditBank() {
+    editingBank = false;
+    bankFormError = "";
+    bankFormLoading = false;
+  }
+
+  async function submitEditBank() {
+    bankFormError = "";
+    const payload = {
+      title: (bankForm.title || "").trim(),
+      description: bankForm.description || "",
+      discipline: bankForm.discipline || "",
+      academicYear: bankForm.academicYear || "",
+      language: bankForm.language || "",
+    };
+
+    if (!payload.title) {
+      bankFormError = "Título é obrigatório";
+      return;
+    }
+
+    bankFormLoading = true;
+    try {
+      const { data } = await api.put(`/banks/${bank._id}`, payload);
+      bank = data;
+      editingBank = false;
+    } catch (e) {
+      bankFormError = e?.response?.data?.error || "Erro ao atualizar banco.";
+    } finally {
+      bankFormLoading = false;
+    }
+  }
+
+  async function deleteBank() {
+    deleteError = "";
+    try {
+      await api.delete(`/banks/${bank._id}`);
+      window.location.href = "/app/banks";
+    } catch (e) {
+      deleteError = e?.response?.data?.error || "Erro ao apagar banco.";
     }
   }
 
@@ -220,6 +297,28 @@
     selected = next;
   }
 
+  function confirmDeleteQuestion(question) {
+    deletingQuestion = question;
+    deleteQuestionError = "";
+  }
+
+  function closeDeleteQuestion() {
+    deletingQuestion = null;
+    deleteQuestionError = "";
+  }
+
+  async function deleteQuestionById() {
+    if (!deletingQuestion) return;
+    deleteQuestionError = "";
+    try {
+      await api.delete(`/questions/${deletingQuestion._id}`);
+      deletingQuestion = null;
+      await loadAll();
+    } catch (e) {
+      deleteQuestionError = e?.response?.data?.error || "Erro ao apagar questão.";
+    }
+  }
+
   function selectFilteredAll() {
     const next = new Set(selected);
     filtered.forEach((q) => next.add(q._id));
@@ -268,22 +367,92 @@
   <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px;">
     <h2 style="margin: 0;">{bank.title}</h2>
 
-    {#if bank.description}
-      <p style="margin: 6px 0 0; color: var(--muted);">{bank.description}</p>
-    {/if}
-
-    <div style="margin-top: 10px; font-size: 14px; color: var(--muted);">
-      {bank.discipline} • {bank.academicYear} • {bank.language}
-    </div>
-
     <div style="margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
+      <button class="btn" on:click={startEditBank}>✏️ Editar</button>
       <a class="btn" href={`/app/banks/${bank._id}/questions/new`}>+ Nova questão</a>
       <button class="btn btn-secondary" on:click={() => showExportModal = true} disabled={questions.length === 0}>
         📤 Exportar
       </button>
+      <button class="btn btn-delete" on:click={() => deletingBank = true}>
+        🗑️ Eliminar
+      </button>
       <a class="btn" href="/app/banks">Voltar aos bancos</a>
     </div>
   </div>
+
+  {#if editingBank}
+    <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 16px; display: grid; gap: 12px;">
+      <div style="display:flex; justify-content: space-between; align-items:center; gap:12px;">
+        <h3 style="margin:0;">Editar banco</h3>
+        <button class="btn" on:click={cancelEditBank} disabled={bankFormLoading}>Fechar</button>
+      </div>
+
+      <div style="display:grid; gap:12px;">
+        <div>
+          <label style="font-size: 13px; color: var(--muted);">Título</label>
+          <input
+            value={bankForm.title}
+            on:input={(e) => bankForm.title = e.target.value}
+            style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
+            disabled={bankFormLoading}
+            required
+          />
+        </div>
+
+        <div>
+          <label style="font-size: 13px; color: var(--muted);">Descrição</label>
+          <textarea
+            value={bankForm.description}
+            on:input={(e) => bankForm.description = e.target.value}
+            rows="3"
+            style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
+            disabled={bankFormLoading}
+          ></textarea>
+        </div>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+          <div>
+            <label style="font-size: 13px; color: var(--muted);">Disciplina</label>
+            <input
+              value={bankForm.discipline}
+              on:input={(e) => bankForm.discipline = e.target.value}
+              style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
+              disabled={bankFormLoading}
+            />
+          </div>
+          <div>
+            <label style="font-size: 13px; color: var(--muted);">Ano letivo</label>
+            <input
+              value={bankForm.academicYear}
+              on:input={(e) => bankForm.academicYear = e.target.value}
+              style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
+              disabled={bankFormLoading}
+            />
+          </div>
+          <div>
+            <label style="font-size: 13px; color: var(--muted);">Língua</label>
+            <input
+              value={bankForm.language}
+              on:input={(e) => bankForm.language = e.target.value}
+              style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
+              disabled={bankFormLoading}
+            />
+          </div>
+        </div>
+
+        {#if bankFormError}
+          <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:10px; color:#b91c1c;">{bankFormError}</div>
+        {/if}
+
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+          <button class="btn" on:click={cancelEditBank} disabled={bankFormLoading}>Cancelar</button>
+          <button class="btn primary" on:click={submitEditBank} disabled={bankFormLoading}>
+            {bankFormLoading ? "A guardar..." : "Guardar alterações"}
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
 
   <!-- Modal de Exportação -->
   {#if showExportModal}
@@ -356,11 +525,12 @@
           </button>
         </div>
 
-        {#if exportLoading}
-          <div style="margin-top: 16px; text-align: center; color: var(--muted); font-size: 14px;">
-            A exportar...
-          </div>
-        {/if}
+  {#if exportLoading}
+    <div style="margin-top: 16px; text-align: center; color: var(--muted); font-size: 14px;">
+      A exportar...
+    </div>
+  {/if}
+
 
         <button 
           class="btn" 
@@ -373,6 +543,44 @@
     </div>
   {/if}
 
+
+  <!-- Modal apagar questão -->
+  {#if deletingQuestion}
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:1000;">
+      <div style="background:white; border-radius: 14px; padding: 20px; width: 100%; max-width: 440px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15);">
+        <h3 style="margin:0 0 10px 0;">Eliminar questão</h3>
+        <p style="margin:0 0 12px 0; color: var(--muted);">Esta ação remove a questão do banco.</p>
+        {#if deleteQuestionError}
+          <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:10px; color:#b91c1c; margin-bottom:10px;">
+            {deleteQuestionError}
+          </div>
+        {/if}
+        <div style="display:flex; gap:10px; justify-content:flex-end;">
+          <button class="btn" on:click={closeDeleteQuestion}>Cancelar</button>
+          <button class="btn btn-delete" on:click={deleteQuestionById}>Eliminar</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Modal apagar banco -->
+  {#if deletingBank}
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;">
+      <div style="background: white; border-radius: 14px; padding: 22px; width: 100%; max-width: 460px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15);">
+        <h3 style="margin: 0 0 10px 0;">Eliminar banco</h3>
+        <p style="margin: 0 0 14px 0; color: var(--muted);">Esta ação remove o banco e todas as questões associadas. Não é reversível.</p>
+
+        {#if deleteError}
+          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 10px; color: #b91c1c; margin-bottom: 12px;">{deleteError}</div>
+        {/if}
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px;">
+          <button class="btn" on:click={() => { deletingBank = false; deleteError = ""; }}>Cancelar</button>
+          <button class="btn btn-delete" on:click={deleteBank}>Eliminar</button>
+        </div>
+      </div>
+    </div>
+  {/if}
 
   <!-- Filtros -->
   <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 16px;">
@@ -452,10 +660,10 @@
 
     <!-- Chapter Tags Filter -->
     <div style="margin-top: 10px;">
-      <label style="font-size: 13px; color: var(--muted);">Filtrar por etiquetas de capítulo</label>
+      <label style="font-size: 13px; color: var(--muted);">Filtrar por capítulos</label>
       <div style="margin-top: 6px; border: 1px solid var(--border); border-radius: 10px; padding: 10px; max-height: 120px; overflow-y: auto; background: white;">
         {#if availableChapterTags.length === 0}
-          <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma etiqueta de capítulo disponível</p>
+          <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma capítulo disponível</p>
         {:else}
           <div style="display: flex; flex-wrap: wrap; gap: 8px;">
             {#each availableChapterTags as tag}
@@ -526,6 +734,9 @@
 
               <div style="display:flex; gap: 8px;">
                 <a class="btn" href={`/app/banks/${bank._id}/questions/${q._id}/edit`}>Editar</a>
+                <button class="btn btn-delete" type="button" on:click={() => confirmDeleteQuestion(q)}>
+                  Apagar
+                </button>
               </div>
             </div>
 

@@ -1,5 +1,6 @@
 import ChapterTagFolder from "../models/ChapterTagFolder.js";
 import ChapterTag from "../models/ChapterTag.js";
+import Question from "../models/Question.js";
 
 function normalizeName(name) {
   return String(name || "").trim();
@@ -134,11 +135,12 @@ export async function updateFolder(req, res) {
   }
 }
 
-// DELETE /folders/:id?moveToNone=1
+// DELETE /folders/:id?moveToNone=1&deleteTags=1
 export async function deleteFolder(req, res) {
   try {
     const { id } = req.params;
     const moveToNone = String(req.query.moveToNone || "").toLowerCase() === "1";
+    const deleteTags = String(req.query.deleteTags || "").toLowerCase() === "1";
 
     const folder = await ChapterTagFolder.findOne({ _id: id, owner: req.userId });
     if (!folder) {
@@ -147,7 +149,7 @@ export async function deleteFolder(req, res) {
 
     const tagCount = await ChapterTag.countDocuments({ owner: req.userId, folder: folder._id });
 
-    if (tagCount > 0 && !moveToNone) {
+    if (tagCount > 0 && !moveToNone && !deleteTags) {
       return res.status(400).json({
         error: "A pasta tem etiquetas. Mova-as primeiro ou use moveToNone=1 para enviar para 'Sem pasta'",
       });
@@ -155,6 +157,19 @@ export async function deleteFolder(req, res) {
 
     if (tagCount > 0 && moveToNone) {
       await ChapterTag.updateMany({ owner: req.userId, folder: folder._id }, { $set: { folder: null } });
+    }
+
+    if (tagCount > 0 && deleteTags) {
+      const tagIds = await ChapterTag.find({ owner: req.userId, folder: folder._id }).distinct("_id");
+      if (tagIds.length > 0) {
+        await Promise.all([
+          Question.updateMany(
+            { owner: req.userId, chapterTags: { $in: tagIds } },
+            { $pull: { chapterTags: { $in: tagIds } } }
+          ),
+          ChapterTag.deleteMany({ _id: { $in: tagIds }, owner: req.userId })
+        ]);
+      }
     }
 
     await folder.deleteOne();

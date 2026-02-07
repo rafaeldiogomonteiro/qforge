@@ -28,16 +28,17 @@
   let deletingTag = null;
   let deleteMode = "deactivate"; // deactivate | delete
   let deletingFolder = null;
-  let moveFolderContents = false;
 
   // Move existing tags into a folder (no drag-and-drop)
-  let moveTagsModalOpen = false;
-  let moveTagsTargetFolderId = ""; // "" = Sem pasta
-  let moveTagsSearch = "";
-  let moveTagsSelected = new Set();
-  let moveTagsSelectAllEl;
-  let moveTagsLoading = false;
-  let moveTagsError = "";
+let moveTagsModalOpen = false;
+let moveTagsTargetFolderId = ""; // "" = Sem pasta
+let moveTagsSearch = "";
+let moveTagsSelected = new Set();
+let moveTagsSelectAllEl;
+let moveTagsLoading = false;
+let moveTagsError = "";
+
+let deleteFolderMode = "move"; // move | delete
 
   onMount(loadData);
 
@@ -356,30 +357,30 @@
     }
   }
 
-  function confirmDeleteFolder(folder) {
-    deletingFolder = folder;
-    moveFolderContents = false;
-  }
+function confirmDeleteFolder(folder) {
+  deletingFolder = folder;
+  deleteFolderMode = "move";
+}
 
-  function closeDeleteFolder() {
+function closeDeleteFolder() {
+  deletingFolder = null;
+  deleteFolderMode = "move";
+}
+
+async function deleteFolder() {
+  if (!deletingFolder) return;
+  try {
+    const suffix = deleteFolderMode === "delete" ? "?deleteTags=1" : "?moveToNone=1";
+    await api.delete(`/folders/${deletingFolder._id}${suffix}`);
     deletingFolder = null;
-    moveFolderContents = false;
+    deleteFolderMode = "move";
+    await loadData();
+  } catch (e) {
+    error = e?.response?.data?.error || "Erro ao apagar pasta";
+    deletingFolder = null;
+    deleteFolderMode = "move";
   }
-
-  async function deleteFolder(moveToNone = false) {
-    if (!deletingFolder) return;
-    try {
-      const suffix = moveToNone ? "?moveToNone=1" : "";
-      await api.delete(`/folders/${deletingFolder._id}${suffix}`);
-      deletingFolder = null;
-      moveFolderContents = false;
-      await loadData();
-    } catch (e) {
-      error = e?.response?.data?.error || "Erro ao apagar pasta";
-      deletingFolder = null;
-      moveFolderContents = false;
-    }
-  }
+}
 </script>
 
 <div style="max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
@@ -708,14 +709,29 @@
 
     <div class="modal-content" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="delete-folder-title">
       <h3 id="delete-folder-title" style="margin: 0 0 12px 0;">Apagar pasta</h3>
-      <p style="margin: 0 0 12px 0; color: var(--muted);">Escolhe a ação para "{deletingFolder.name}".</p>
-      <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 10px;">
-        <input type="checkbox" bind:checked={moveFolderContents} />
-        Mover etiquetas para "Sem pasta" e apagar
-      </label>
+      <p style="margin: 0 0 12px 0; color: var(--muted);">Escolhe como tratar as etiquetas desta pasta.</p>
+
+      <div style="display: grid; gap: 8px; margin-bottom: 12px;">
+        <label class="option-row">
+          <input type="radio" name="deleteFolderMode" value="move" bind:group={deleteFolderMode} />
+          <div>
+            <div style="font-weight: 600;">Mover para "Sem pasta" e apagar pasta</div>
+            <div class="option-help">As etiquetas continuam disponíveis na lista geral.</div>
+          </div>
+        </label>
+
+        <label class="option-row">
+          <input type="radio" name="deleteFolderMode" value="delete" bind:group={deleteFolderMode} />
+          <div>
+            <div style="font-weight: 600; color: #b91c1c;">Apagar pasta e etiquetas</div>
+            <div class="option-help">Remove a pasta e elimina definitivamente as etiquetas dentro dela.</div>
+          </div>
+        </label>
+      </div>
+
       <div style="display: flex; gap: 10px; justify-content: flex-end;">
         <button class="btn" on:click={closeDeleteFolder}>Cancelar</button>
-        <button class="btn btn-delete" on:click={() => deleteFolder(moveFolderContents)}>Apagar</button>
+        <button class="btn btn-delete" on:click={deleteFolder}>Apagar</button>
       </div>
     </div>
   </div>

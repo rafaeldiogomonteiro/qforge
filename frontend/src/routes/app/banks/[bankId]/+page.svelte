@@ -360,13 +360,17 @@
   <!-- Cabeçalho -->
   <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px;">
     <h2 style="margin: 0;">{bank.title}</h2>
+    {#if bank.description}
+      <p style="margin: 6px 0 0; color: var(--muted);">{bank.description}</p>
+    {/if}
 
     <div style="margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
-      <button class="btn" on:click={startEditBank}>✏️ Editar</button>
       <a class="btn" href={`/app/banks/${bank._id}/questions/new`}>+ Nova questão</a>
+      
       <button class="btn btn-secondary" on:click={() => showExportModal = true} disabled={questions.length === 0}>
         📤 Exportar
       </button>
+      <button class="btn" on:click={startEditBank}>✏️ Editar</button>
       <button class="btn btn-delete" on:click={() => deletingBank = true}>
         🗑️ Eliminar
       </button>

@@ -305,7 +305,7 @@
         on:click={() => (showLabelsPanel = !showLabelsPanel)}
         style="width: 100%; justify-content: space-between; display: flex; align-items: center;"
       >
-        <span>Labels (opcional){#if selectedLabels.length > 0} — {selectedLabels.length} selecionada(s){/if}</span>
+        <span>Etiquetas (opcional){#if selectedLabels.length > 0} — {selectedLabels.length} selecionada(s){/if}</span>
         <span style="font-size: 12px; color: var(--muted);">{showLabelsPanel ? "Esconder ▲" : "Mostrar ▼"}</span>
       </button>
 
@@ -393,6 +393,9 @@
                           />
                           <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #f5f3ff; border: 1px solid #c4b5fd;">
                             📌 {tag.name}
+                          </span>
+                          <span style="font-size: 12px; color: var(--muted);">
+                            {group.folder ? group.folder.name : "Sem pasta"}
                           </span>
                         </label>
                       {/each}

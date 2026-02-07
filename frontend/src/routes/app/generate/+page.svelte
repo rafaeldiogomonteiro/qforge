@@ -584,6 +584,9 @@
                           <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #f5f3ff; border: 1px solid #c4b5fd;">
                             📌 {tag.name}
                           </span>
+                          <span style="font-size: 12px; color: var(--muted);">
+                            {group.folder ? group.folder.name : "Sem pasta"}
+                          </span>
                             </label>
                           {/each}
                         </div>

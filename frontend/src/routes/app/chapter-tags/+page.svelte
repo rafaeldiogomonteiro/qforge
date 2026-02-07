@@ -754,9 +754,9 @@
   }
 
   .btn-delete {
-    background: #dc2626 !important;
-    color: white !important;
-    border-color: #dc2626 !important;
+    background: #dc2626;
+    color: white;
+    border-color: #dc2626;
   }
 
   .option-row {

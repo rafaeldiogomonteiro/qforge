@@ -66,9 +66,6 @@
       bankForm = {
         title: bank?.title || "",
         description: bank?.description || "",
-        discipline: bank?.discipline || "",
-        academicYear: bank?.academicYear || "",
-        language: bank?.language || ""
       };
     } catch (e) {
       error = e?.response?.data?.message || "Erro ao carregar banco.";
@@ -85,9 +82,6 @@
     bankForm = {
       title: bank.title || "",
       description: bank.description || "",
-      discipline: bank.discipline || "",
-      academicYear: bank.academicYear || "",
-      language: bank.language || "",
     };
   }
 
@@ -410,34 +404,6 @@
           ></textarea>
         </div>
 
-        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-          <div>
-            <label style="font-size: 13px; color: var(--muted);">Disciplina</label>
-            <input
-              value={bankForm.discipline}
-              on:input={(e) => bankForm.discipline = e.target.value}
-              style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
-              disabled={bankFormLoading}
-            />
-          </div>
-          <div>
-            <label style="font-size: 13px; color: var(--muted);">Ano letivo</label>
-            <input
-              value={bankForm.academicYear}
-              on:input={(e) => bankForm.academicYear = e.target.value}
-              style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
-              disabled={bankFormLoading}
-            />
-          </div>
-          <div>
-            <label style="font-size: 13px; color: var(--muted);">Língua</label>
-            <input
-              value={bankForm.language}
-              on:input={(e) => bankForm.language = e.target.value}
-              style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
-              disabled={bankFormLoading}
-            />
-          </div>
         </div>
 
         {#if bankFormError}
@@ -451,7 +417,7 @@
           </button>
         </div>
       </div>
-    </div>
+  
   {/if}
 
   <!-- Modal de Exportação -->

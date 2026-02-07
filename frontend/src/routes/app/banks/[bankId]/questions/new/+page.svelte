@@ -253,12 +253,6 @@
   <div style="display:flex; align-items:flex-end; justify-content:space-between; gap: 16px;">
     <div>
       <h2 style="margin: 0;">Nova Questão</h2>
-      <p style="margin: 6px 0 0; color: var(--muted);">
-        Banco:
-        <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">
-          {bankId}
-        </span>
-      </p>
     </div>
 
     <a class="btn" href={`/app/banks/${bankId}`}>Voltar</a>

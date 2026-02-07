@@ -520,7 +520,7 @@
                       style="width: 16px; height: 16px;"
                     />
                     <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #ecfeff; border: 1px solid #a5f3fc;">
-                      📝 {label.name}
+                      🏷️ {label.name}
                     </span>
                   </label>
                 {/each}
@@ -582,7 +582,7 @@
                                 style="width: 16px; height: 16px;"
                               />
                           <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #f5f3ff; border: 1px solid #c4b5fd;">
-                            📑 {tag.name}
+                            📌 {tag.name}
                           </span>
                             </label>
                           {/each}

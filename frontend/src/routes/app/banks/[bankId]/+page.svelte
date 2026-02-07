@@ -790,7 +790,7 @@
                 {#each q.labels as label}
                   {#if typeof label !== 'string' && label?.name}
                   <span style="display:inline-flex; padding:3px 8px; border-radius:999px; font-size:12px; border:1px solid #a5f3fc; background:#ecfeff; color:#155e75;">
-                    📝 {label.name}
+                    🏷️ {label.name}
                   </span>
                   {/if}
                 {/each}

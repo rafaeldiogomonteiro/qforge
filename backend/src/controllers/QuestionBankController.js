@@ -533,6 +533,111 @@ function stripHtml(value = "") {
   return String(value).replace(/<[^>]*>/g, "").trim();
 }
 
+function normalizeNameKey(value = "") {
+  return String(value || "").trim().toLowerCase();
+}
+
+function uniqueNormalizedNames(values = []) {
+  const out = [];
+  const seen = new Set();
+
+  for (const raw of values || []) {
+    const value = String(raw || "").trim();
+    if (!value) continue;
+    const key = normalizeNameKey(value);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+  }
+
+  return out;
+}
+
+function uniqueObjectIds(values = []) {
+  const out = [];
+  const seen = new Set();
+
+  for (const value of values || []) {
+    if (!value) continue;
+    const key = String(value);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(value);
+  }
+
+  return out;
+}
+
+function idsFromNames(names = [], idByNormalizedName = new Map()) {
+  const out = [];
+  const seen = new Set();
+
+  for (const rawName of names || []) {
+    const key = normalizeNameKey(rawName);
+    if (!key) continue;
+    const id = idByNormalizedName.get(key);
+    if (!id) continue;
+    const idKey = String(id);
+    if (seen.has(idKey)) continue;
+    seen.add(idKey);
+    out.push(id);
+  }
+
+  return out;
+}
+
+function parseMoodleQuestionTaxonomy(rawTags) {
+  const tagNodes = Array.isArray(rawTags?.tag)
+    ? rawTags.tag
+    : rawTags?.tag
+    ? [rawTags.tag]
+    : [];
+
+  const labels = [];
+  const chapterTags = [];
+
+  for (const rawTag of tagNodes) {
+    const rawText = typeof rawTag === "string" ? rawTag : rawTag?.text;
+    const tagText = stripHtml(rawText || "");
+    if (!tagText) continue;
+
+    const separatorIndex = tagText.indexOf(":");
+    if (separatorIndex <= 0) {
+      chapterTags.push(tagText);
+      continue;
+    }
+
+    const prefix = normalizeNameKey(tagText.slice(0, separatorIndex));
+    const value = String(tagText.slice(separatorIndex + 1) || "").trim();
+    if (!value) continue;
+
+    if (prefix === "label" || prefix === "labels") {
+      labels.push(value);
+      continue;
+    }
+
+    if (
+      prefix === "chapter" ||
+      prefix === "chaptertag" ||
+      prefix === "chaptertags" ||
+      prefix === "chapter-tag" ||
+      prefix === "chapter_tags" ||
+      prefix === "tag" ||
+      prefix === "tags"
+    ) {
+      chapterTags.push(value);
+      continue;
+    }
+
+    chapterTags.push(tagText);
+  }
+
+  return {
+    labels: uniqueNormalizedNames(labels),
+    chapterTags: uniqueNormalizedNames(chapterTags),
+  };
+}
+
 async function upsertLabelsFromNames(names, ownerId) {
   const cleaned = [...new Set((names || []).map((n) => String(n || "").trim()).filter(Boolean))];
   const ids = [];
@@ -695,6 +800,8 @@ function parseQuestionsFromMoodleXml(content) {
     const qType = String(q.type || "").toLowerCase();
     const stem = stripHtml(q.questiontext?.text || q.questiontext || "");
     if (!stem) continue;
+    const { labels, chapterTags } = parseMoodleQuestionTaxonomy(q.tags);
+    const legacyTags = uniqueNormalizedNames(chapterTags);
 
     if (qType === "multichoice") {
       const answers = Array.isArray(q.answer) ? q.answer : q.answer ? [q.answer] : [];
@@ -702,7 +809,16 @@ function parseQuestionsFromMoodleXml(content) {
         .map((a) => ({ text: stripHtml(a?.text || ""), isCorrect: Number(a?.fraction || 0) > 0 }))
         .filter((o) => o.text);
       if (!options.some((o) => o.isCorrect) && options.length > 0) options[0].isCorrect = true;
-      questions.push({ type: "MULTIPLE_CHOICE", stem, options, acceptableAnswers: [], difficulty: 2 });
+      questions.push({
+        type: "MULTIPLE_CHOICE",
+        stem,
+        options,
+        acceptableAnswers: [],
+        difficulty: 2,
+        labels,
+        chapterTags,
+        tags: legacyTags,
+      });
       continue;
     }
 
@@ -717,7 +833,16 @@ function parseQuestionsFromMoodleXml(content) {
         { text: "Verdadeiro", isCorrect: correctIsTrue },
         { text: "Falso", isCorrect: !correctIsTrue },
       ];
-      questions.push({ type: "TRUE_FALSE", stem, options, acceptableAnswers: [], difficulty: 2 });
+      questions.push({
+        type: "TRUE_FALSE",
+        stem,
+        options,
+        acceptableAnswers: [],
+        difficulty: 2,
+        labels,
+        chapterTags,
+        tags: legacyTags,
+      });
       continue;
     }
 
@@ -725,12 +850,30 @@ function parseQuestionsFromMoodleXml(content) {
       const answers = Array.isArray(q.answer) ? q.answer : q.answer ? [q.answer] : [];
       const acceptableAnswers = answers.map((a) => stripHtml(a?.text || "")).filter(Boolean);
       if (acceptableAnswers.length === 0) continue;
-      questions.push({ type: "SHORT_ANSWER", stem, options: [], acceptableAnswers, difficulty: 2 });
+      questions.push({
+        type: "SHORT_ANSWER",
+        stem,
+        options: [],
+        acceptableAnswers,
+        difficulty: 2,
+        labels,
+        chapterTags,
+        tags: legacyTags,
+      });
       continue;
     }
 
     if (qType === "essay") {
-      questions.push({ type: "OPEN", stem, options: [], acceptableAnswers: [], difficulty: 2 });
+      questions.push({
+        type: "OPEN",
+        stem,
+        options: [],
+        acceptableAnswers: [],
+        difficulty: 2,
+        labels,
+        chapterTags,
+        tags: legacyTags,
+      });
       continue;
     }
   }
@@ -738,7 +881,12 @@ function parseQuestionsFromMoodleXml(content) {
   return questions;
 }
 
-function buildQuestionDocs(parsedQuestions, bankId, userId, labelIds = [], chapterTagIds = []) {
+function buildQuestionDocs(
+  parsedQuestions,
+  bankId,
+  userId,
+  { globalChapterTagNames = [] } = {}
+) {
   const docs = [];
   let skipped = 0;
 
@@ -749,6 +897,15 @@ function buildQuestionDocs(parsedQuestions, bankId, userId, labelIds = [], chapt
       skipped += 1;
       continue;
     }
+
+    const questionLabelNames = uniqueNormalizedNames(q.labels || []);
+    const questionChapterTagNames = uniqueNormalizedNames(
+      Array.isArray(q.chapterTags) && q.chapterTags.length ? q.chapterTags : q.tags || []
+    );
+    const mergedLegacyTags = uniqueNormalizedNames([
+      ...globalChapterTagNames,
+      ...questionChapterTagNames,
+    ]);
 
     const doc = {
       bank: bankId,
@@ -764,9 +921,11 @@ function buildQuestionDocs(parsedQuestions, bankId, userId, labelIds = [], chapt
         ? q.acceptableAnswers.map((a) => String(a || "").trim()).filter(Boolean)
         : [],
       difficulty: clampDifficulty(q.difficulty ?? 2),
-      tags: Array.isArray(q.tags) ? q.tags.map((t) => String(t || "").trim()).filter(Boolean) : [],
-      chapterTags: chapterTagIds,
-      labels: labelIds,
+      tags: mergedLegacyTags,
+      chapterTags: [],
+      labels: [],
+      _questionLabelNames: questionLabelNames,
+      _questionChapterTagNames: questionChapterTagNames,
       source: "IMPORTED",
       createdBy: userId,
     };
@@ -821,15 +980,30 @@ export async function importBank(req, res) {
       return res.status(400).json({ error: "Formato inválido. Use aiken, gift ou moodle" });
     }
 
-    const { docs, skipped } = buildQuestionDocs(parsed, null, req.userId);
+    const tagsList = normalizeToStringArray(tags);
+    const requestedLabelNames = uniqueNormalizedNames(normalizeToStringArray(labels));
+    const requestedChapterTagNames = uniqueNormalizedNames(normalizeToStringArray(chapterTags));
+
+    const { docs, skipped } = buildQuestionDocs(parsed, null, req.userId, {
+      globalChapterTagNames: requestedChapterTagNames,
+    });
 
     if (docs.length === 0) {
       return res.status(400).json({ error: "Nenhuma questão válida encontrada no ficheiro" });
     }
 
-    const tagsList = normalizeToStringArray(tags);
-    const labelNames = normalizeToStringArray(labels);
-    const chapterTagNames = normalizeToStringArray(chapterTags);
+    const parsedLabelNames = uniqueNormalizedNames(
+      docs.flatMap((doc) => doc._questionLabelNames || [])
+    );
+    const parsedChapterTagNames = uniqueNormalizedNames(
+      docs.flatMap((doc) => doc._questionChapterTagNames || [])
+    );
+
+    const labelNames = uniqueNormalizedNames([...requestedLabelNames, ...parsedLabelNames]);
+    const chapterTagNames = uniqueNormalizedNames([
+      ...requestedChapterTagNames,
+      ...parsedChapterTagNames,
+    ]);
 
     const bank = await QuestionBank.create({
       title: trimmedTitle,
@@ -844,12 +1018,34 @@ export async function importBank(req, res) {
     const labelIds = await upsertLabelsFromNames(labelNames, req.userId);
     const chapterTagIds = await upsertChapterTagsFromNames(chapterTagNames, req.userId);
 
-    const docsWithIds = docs.map((doc) => ({
-      ...doc,
-      bank: bank._id,
-      labels: labelIds,
-      chapterTags: chapterTagIds,
-    }));
+    const labelIdByNormalizedName = new Map(
+      labelNames.map((name, idx) => [normalizeNameKey(name), labelIds[idx]])
+    );
+    const chapterTagIdByNormalizedName = new Map(
+      chapterTagNames.map((name, idx) => [normalizeNameKey(name), chapterTagIds[idx]])
+    );
+
+    const globalLabelIds = idsFromNames(requestedLabelNames, labelIdByNormalizedName);
+    const globalChapterTagIds = idsFromNames(
+      requestedChapterTagNames,
+      chapterTagIdByNormalizedName
+    );
+
+    const docsWithIds = docs.map((doc) => {
+      const { _questionLabelNames, _questionChapterTagNames, ...cleanDoc } = doc;
+      const perQuestionLabelIds = idsFromNames(_questionLabelNames, labelIdByNormalizedName);
+      const perQuestionChapterTagIds = idsFromNames(
+        _questionChapterTagNames,
+        chapterTagIdByNormalizedName
+      );
+
+      return {
+        ...cleanDoc,
+        bank: bank._id,
+        labels: uniqueObjectIds([...globalLabelIds, ...perQuestionLabelIds]),
+        chapterTags: uniqueObjectIds([...globalChapterTagIds, ...perQuestionChapterTagIds]),
+      };
+    });
 
     const created = await Question.insertMany(docsWithIds, { ordered: false });
 

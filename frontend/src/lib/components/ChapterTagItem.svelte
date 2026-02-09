@@ -42,10 +42,10 @@
       </button>
       <button
         class="btn btn-delete"
-        on:click={() => onDelete(tag, "delete")}
+x        on:click={() => onDelete(tag, "delete")}
         title="Eliminar etiqueta"
       >
-        Eliminar
+        Apagar
       </button>
     {:else}
       <button
@@ -60,7 +60,7 @@
         on:click={() => onDelete(tag, "delete")}
         title="Eliminar etiqueta"
       >
-        Eliminar
+        Apagar
       </button>
     {/if}
   </div>

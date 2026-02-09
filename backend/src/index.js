@@ -96,7 +96,7 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", message: "QForge API está a funcionar" });
 });
 
-const PORT = Number(process.env.PORT) || 4000;
+const PORT = 4000;
 
 async function start() {
   try {

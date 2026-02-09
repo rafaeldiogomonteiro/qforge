@@ -243,10 +243,20 @@
       
       console.log('Questões geradas:', generated);
   } catch (e) {
-    error =
-      e?.response?.data?.error ||
-      e?.response?.data?.message ||
-      "Erro ao gerar questões com IA.";
+    const status = e?.response?.status;
+
+    if (status === 504) {
+      error =
+        "A geração de IA excedeu o tempo limite do servidor. Tenta novamente com menos questões ou menos conteúdo.";
+    } else if (!e?.response && /network error/i.test(String(e?.message || ""))) {
+      error =
+        "Falha de ligação ao servidor (possível timeout/proxy). Tenta novamente dentro de instantes.";
+    } else {
+      error =
+        e?.response?.data?.error ||
+        e?.response?.data?.message ||
+        "Erro ao gerar questões com IA.";
+    }
   } finally {
     generating = false;
   }

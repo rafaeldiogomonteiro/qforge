@@ -6,11 +6,13 @@ import { Agent, fetch as undiciFetch } from "undici";
 
 // Dispatcher dedicado para chamadas de IA com timeouts mais generosos
 const AI_CONNECT_TIMEOUT_MS = Number(process.env.AI_CONNECT_TIMEOUT_MS) || 10_000;
-const AI_HEADERS_TIMEOUT_MS = Number(process.env.AI_HEADERS_TIMEOUT_MS) || 90_000;
-const AI_BODY_TIMEOUT_MS = Number(process.env.AI_BODY_TIMEOUT_MS) || 240_000;
-const AI_REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS) || 240_000;
-const AI_REQUEST_RETRIES = Number(process.env.AI_REQUEST_RETRIES ?? 1); // nº de tentativas extra
+const AI_HEADERS_TIMEOUT_MS = Number(process.env.AI_HEADERS_TIMEOUT_MS) || 30_000;
+const AI_BODY_TIMEOUT_MS = Number(process.env.AI_BODY_TIMEOUT_MS) || 45_000;
+const AI_REQUEST_TIMEOUT_MS = Number(process.env.AI_REQUEST_TIMEOUT_MS) || 45_000;
+const AI_REQUEST_RETRIES = Number(process.env.AI_REQUEST_RETRIES ?? 0); // nº de tentativas extra
 const AI_RETRY_DELAY_MS = Number(process.env.AI_RETRY_DELAY_MS) || 1_500;
+const AI_MAX_TOKENS = Number(process.env.AI_MAX_TOKENS) || 2_048;
+const OPENROUTER_FAST_MODEL = process.env.OPENROUTER_FAST_MODEL || "";
 
 const aiDispatcher = new Agent({
   connect: { timeout: AI_CONNECT_TIMEOUT_MS },
@@ -25,6 +27,13 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+
+function isRetriableProviderError(err) {
+  const message = String(err?.message || "");
+  return /(tempo limite|timeout|timed out|rate limit|429|502|503|504|overloaded|temporarily unavailable)/i.test(
+    message
+  );
+}
 
 // Modelos disponíveis no Groq (gratuitos)
 export const GROQ_MODELS = {
@@ -53,8 +62,8 @@ async function callChatAPI(
   model,
   messages,
   temperature = 0.7,
-  maxTokens = 4096
-  ) {
+  maxTokens = AI_MAX_TOKENS
+) {
   const baseURL =
     provider?.baseURL ||
     (provider?.name === "openrouter" ? OPENROUTER_BASE_URL : GROQ_BASE_URL);
@@ -247,7 +256,7 @@ function buildUserPrompt(params) {
  * Gera questões usando IA
  */
 export async function generateQuestions(provider, params) {
-  const {
+  let {
     model = provider?.model || GROQ_MODELS.LLAMA_3_3_70B,
     language = "pt-PT",
     topic,
@@ -279,7 +288,38 @@ export async function generateQuestions(provider, params) {
     },
   ];
 
-  const responseText = await callChatAPI(provider, model, messages);
+  let responseText;
+  try {
+    responseText = await callChatAPI(
+      provider,
+      model,
+      messages,
+      0.7,
+      AI_MAX_TOKENS
+    );
+  } catch (err) {
+    const canUseFastFallback =
+      provider?.name === "openrouter" &&
+      OPENROUTER_FAST_MODEL &&
+      OPENROUTER_FAST_MODEL !== model &&
+      isRetriableProviderError(err);
+
+    if (!canUseFastFallback) {
+      throw err;
+    }
+
+    console.warn(
+      `[AI] Falha no modelo ${model}. A tentar fallback para ${OPENROUTER_FAST_MODEL}. Motivo: ${err.message}`
+    );
+    model = OPENROUTER_FAST_MODEL;
+    responseText = await callChatAPI(
+      provider,
+      model,
+      messages,
+      0.7,
+      AI_MAX_TOKENS
+    );
+  }
 
   // Parse JSON response
   let parsed;
@@ -345,4 +385,3 @@ export async function generateQuestions(provider, params) {
     model,
   };
 }
-

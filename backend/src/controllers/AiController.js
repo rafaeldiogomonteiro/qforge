@@ -161,8 +161,11 @@ export async function generateQuestionsHandler(req, res) {
     });
   } catch (err) {
     console.error("Erro em generateQuestionsHandler:", err);
-    res.status(500).json({
-      error: err.message || "Erro ao gerar questões",
+    const message = err?.message || "Erro ao gerar questões";
+    const isTimeout = /(tempo limite|timeout|timed out)/i.test(message);
+
+    res.status(isTimeout ? 504 : 500).json({
+      error: message,
     });
   }
 }

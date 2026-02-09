@@ -58,7 +58,7 @@ async function start() {
       ChapterTag.syncIndexes(),
     ]);
 
-    app.listen(PORT, () => {
+    app.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 Server a correr em http://localhost:${PORT}`);
     });
   } catch (err) {

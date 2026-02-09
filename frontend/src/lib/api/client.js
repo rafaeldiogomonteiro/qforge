@@ -3,7 +3,8 @@ import { get } from "svelte/store";
 import { authToken } from "$lib/stores/auth";
 import { currentUser } from "$lib/stores/user";
 
-const baseURL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+const baseURL =
+  import.meta.env.VITE_API_URL || "https://qforge-backend.maruqes.com";
 
 export const api = axios.create({ baseURL });
 

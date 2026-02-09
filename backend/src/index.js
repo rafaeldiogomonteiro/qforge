@@ -68,7 +68,7 @@ app.get("/health", (req, res) => {
   res.json({ status: "ok", message: "QForge API está a funcionar" });
 });
 
-const PORT = process.env.PORT || 4000;
+const PORT = 4000;
 
 async function start() {
   try {
@@ -81,8 +81,18 @@ async function start() {
       ChapterTag.syncIndexes(),
     ]);
 
-    app.listen(PORT, "0.0.0.0", () => {
+    const server = app.listen(PORT, "0.0.0.0", () => {
       console.log(`🚀 Server a correr em http://localhost:${PORT}`);
+    });
+
+    server.on("error", (err) => {
+      if (err.code === "EADDRINUSE") {
+        console.error(`❌ A porta ${PORT} já está em uso.`);
+        process.exit(1);
+      }
+
+      console.error("❌ Erro ao iniciar o servidor:", err.message);
+      process.exit(1);
     });
   } catch (err) {
     console.error("❌ Erro ao ligar à base de dados:", err.message);

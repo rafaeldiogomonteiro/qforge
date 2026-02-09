@@ -25,22 +25,50 @@ import ChapterTag from "./models/ChapterTag.js";
 
 const app = express();
 
-const allowedOrigins = new Set([
+function normalizeOrigin(value) {
+  if (!value || typeof value !== "string") return null;
+
+  const trimmed = value.trim().replace(/\/$/, "");
+  if (!trimmed) return null;
+
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed;
+  }
+}
+
+const defaultAllowedOrigins = [
   "https://qforge.maruqes.com",
+  "https://www.qforge.maruqes.com",
   "https://qforge-backend.maruqes.com",
-]);
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
+
+const envAllowedOrigins = (process.env.ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((origin) => normalizeOrigin(origin))
+  .filter(Boolean);
+
+const allowedOrigins = new Set(
+  [...defaultAllowedOrigins, ...envAllowedOrigins]
+    .map((origin) => normalizeOrigin(origin))
+    .filter(Boolean)
+);
 
 const corsOptions = {
   origin(origin, callback) {
     // Sem Origin: chamadas server-to-server, health checks e ferramentas locais.
     if (!origin) return callback(null, true);
 
-    const normalizedOrigin = origin.endsWith("/") ? origin.slice(0, -1) : origin;
+    const normalizedOrigin = normalizeOrigin(origin);
 
     if (allowedOrigins.has(normalizedOrigin)) {
       return callback(null, true);
     }
 
+    console.warn(`[CORS] Origem bloqueada: ${normalizedOrigin}`);
     return callback(new Error("Not allowed by CORS"));
   },
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

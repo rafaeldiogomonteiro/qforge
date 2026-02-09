@@ -25,7 +25,30 @@ import ChapterTag from "./models/ChapterTag.js";
 
 const app = express();
 
-app.use(cors());
+const allowedOrigins = new Set([
+  "https://qforge.maruqes.com",
+  "https://qforge-backend.maruqes.com",
+]);
+
+const corsOptions = {
+  origin(origin, callback) {
+    // Sem Origin: chamadas server-to-server, health checks e ferramentas locais.
+    if (!origin) return callback(null, true);
+
+    const normalizedOrigin = origin.endsWith("/") ? origin.slice(0, -1) : origin;
+
+    if (allowedOrigins.has(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json());
 
 // Swagger UI em /docs

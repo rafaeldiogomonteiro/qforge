@@ -9,7 +9,6 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 import express from "express";
 import cors from "cors";
 import { connectDB } from "./config/db.js";
-import devRoutes from "./routes/devRoutes.js";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./config/swagger.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -40,9 +39,6 @@ app.use("/labels", labelRoutes);
 app.use("/chapter-tags", chapterTagRoutes);
 app.use("/folders", folderRoutes);
 app.use("/ai", aiRoutes);
-
-// Rotas de teste/desenvolvimento
-app.use("/dev", devRoutes);
 
 // Rota de health check
 app.get("/health", (req, res) => {

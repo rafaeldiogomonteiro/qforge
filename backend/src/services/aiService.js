@@ -29,9 +29,6 @@ const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 // Modelos disponíveis no Groq (gratuitos)
 export const GROQ_MODELS = {
   LLAMA_3_3_70B: "llama-3.3-70b-versatile",
-  LLAMA_3_1_8B: "llama-3.1-8b-instant",
-  MIXTRAL_8X7B: "mixtral-8x7b-32768",
-  GEMMA_2_9B: "gemma2-9b-it",
 };
 
 const DIFFICULTY_LABELS = {
@@ -349,99 +346,3 @@ export async function generateQuestions(provider, params) {
   };
 }
 
-/**
- * Melhora uma questão existente
- */
-export async function improveQuestion(provider, question, instructions = "") {
-  const model = provider?.model || GROQ_MODELS.LLAMA_3_3_70B;
-
-  const systemPrompt = `És um especialista em melhorar questões educativas.
-Recebe uma questão e melhora-a seguindo as instruções.
-Mantém o mesmo tipo e formato. Responde em JSON.
-
-FORMATO DE RESPOSTA:
-{
-  "improved": {
-    "type": "...",
-    "stem": "...",
-    "options": [...],
-    "acceptableAnswers": [...],
-    "explanation": "..."
-  },
-  "changes": ["lista de alterações feitas"]
-}`;
-
-  const userPrompt = `QUESTÃO ORIGINAL:
-${JSON.stringify(question, null, 2)}
-
-INSTRUÇÕES: ${instructions || "Melhora a clareza, os distratores e a explicação."}
-
-Responde APENAS com JSON.`;
-
-  const messages = [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt },
-  ];
-
-  const responseText = await callChatAPI(provider, model, messages);
-
-  let parsed;
-  try {
-    parsed = JSON.parse(responseText);
-  } catch {
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      parsed = JSON.parse(jsonMatch[0]);
-    } else {
-      throw new Error("Resposta da IA não é JSON válido");
-    }
-  }
-
-  return parsed;
-}
-
-/**
- * Gera distratores para uma questão de escolha múltipla
- */
-export async function generateDistractors(
-  provider,
-  stem,
-  correctAnswer,
-  numDistractors = 3
-) {
-  // Se houver modelo rápido definido no provider, usa-o para poupar custos/latência
-  const model =
-    provider?.distractorModel ||
-    provider?.model ||
-    GROQ_MODELS.LLAMA_3_1_8B; // Modelo mais rápido para tarefa simples
-
-  const systemPrompt = `Gera distratores (opções erradas mas plausíveis) para questões de escolha múltipla.
-Os distratores devem parecer credíveis mas estar claramente errados.
-Responde em JSON: { "distractors": ["opção1", "opção2", ...] }`;
-
-  const userPrompt = `ENUNCIADO: ${stem}
-RESPOSTA CORRETA: ${correctAnswer}
-
-Gera ${numDistractors} distratores plausíveis. Responde APENAS com JSON.`;
-
-  const messages = [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt },
-  ];
-
-  const responseText = await callChatAPI(provider, model, messages, 0.8);
-
-  let parsed;
-  try {
-    parsed = JSON.parse(responseText);
-  } catch {
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      parsed = JSON.parse(jsonMatch[0]);
-    } else {
-      throw new Error("Resposta da IA não é JSON válido");
-    }
-  }
-
-  return parsed.distractors || [];
-}

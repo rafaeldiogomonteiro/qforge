@@ -1,7 +1,5 @@
 import {
   generateQuestions,
-  improveQuestion,
-  generateDistractors,
   GROQ_MODELS,
 } from "../services/aiService.js";
 import Question from "../models/Question.js";
@@ -12,21 +10,16 @@ import Label from "../models/Label.js";
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 const OPENROUTER_DEFAULT_MODEL =
   process.env.OPENROUTER_MODEL || "arcee-ai/trinity-large-preview:free";
-const OPENROUTER_FAST_MODEL =
-  process.env.OPENROUTER_FAST_MODEL ||
-  "liquid/lfm-2.5-1.2b-instruct:free";
 
 /**
  * Obtém o provedor de IA (Groq por defeito, senão OpenRouter como fallback)
  */
-function getAiProvider({ preferFastModel = false } = {}) {
+function getAiProvider() {
   if (process.env.GROQ_API_KEY) {
     return {
       name: "groq",
       apiKey: process.env.GROQ_API_KEY,
-      model: preferFastModel
-        ? GROQ_MODELS.LLAMA_3_1_8B
-        : GROQ_MODELS.LLAMA_3_3_70B,
+      model: GROQ_MODELS.LLAMA_3_3_70B,
       baseURL: "https://api.groq.com/openai/v1",
     };
   }
@@ -35,10 +28,9 @@ function getAiProvider({ preferFastModel = false } = {}) {
     return {
       name: "openrouter",
       apiKey: process.env.OPENROUTER_API_KEY,
-      model: preferFastModel ? OPENROUTER_FAST_MODEL : OPENROUTER_DEFAULT_MODEL,
+      model: OPENROUTER_DEFAULT_MODEL,
       baseURL: OPENROUTER_BASE_URL,
       headers: {
-        // OpenRouter recomenda enviar estas headers
         "HTTP-Referer": process.env.OPENROUTER_SITE || "http://localhost:5173",
         "X-Title": process.env.OPENROUTER_TITLE || "QForge",
       },
@@ -172,97 +164,6 @@ export async function generateQuestionsHandler(req, res) {
     res.status(500).json({
       error: err.message || "Erro ao gerar questões",
     });
-  }
-}
-
-/**
- * POST /ai/improve-question
- * Melhora uma questão existente
- */
-export async function improveQuestionHandler(req, res) {
-  try {
-    const { questionId, question, instructions = "" } = req.body;
-
-    let targetQuestion = question;
-
-    // Se foi passado questionId, carrega a questão
-    if (questionId) {
-      const loaded = await Question.findById(questionId).lean();
-      if (!loaded) {
-        return res.status(404).json({ error: "Questão não encontrada" });
-      }
-      targetQuestion = {
-        type: loaded.type,
-        stem: loaded.stem,
-        options: loaded.options,
-        acceptableAnswers: loaded.acceptableAnswers,
-      };
-    }
-
-    if (!targetQuestion || !targetQuestion.stem) {
-      return res
-        .status(400)
-        .json({ error: "É necessário fornecer 'question' ou 'questionId'" });
-    }
-
-    const provider = getAiProvider();
-    if (!provider?.apiKey) {
-      return res
-        .status(400)
-        .json({ error: "API key de IA não configurada" });
-    }
-
-    const result = await improveQuestion(provider, targetQuestion, instructions);
-
-    res.json({
-      success: true,
-      original: targetQuestion,
-      improved: result.improved,
-      changes: result.changes,
-    });
-  } catch (err) {
-    console.error("Erro em improveQuestionHandler:", err);
-    res.status(500).json({ error: err.message || "Erro ao melhorar questão" });
-  }
-}
-
-/**
- * POST /ai/generate-distractors
- * Gera distratores para uma questão
- */
-export async function generateDistractorsHandler(req, res) {
-  try {
-    const { stem, correctAnswer, numDistractors = 3 } = req.body;
-
-    if (!stem || !correctAnswer) {
-      return res
-        .status(400)
-        .json({ error: "'stem' e 'correctAnswer' são obrigatórios" });
-    }
-
-    const provider = getAiProvider({ preferFastModel: true });
-    if (!provider?.apiKey) {
-      return res
-        .status(400)
-        .json({ error: "API key de IA não configurada" });
-    }
-
-    const distractors = await generateDistractors(
-      provider,
-      stem,
-      correctAnswer,
-      numDistractors
-    );
-
-    res.json({
-      success: true,
-      stem,
-      correctAnswer,
-      distractors,
-    });
-  } catch (err) {
-    console.error("Erro em generateDistractorsHandler:", err);
-    res.status(500).json({ error: err.message || "Erro ao gerar distratores" });
   }
 }
 

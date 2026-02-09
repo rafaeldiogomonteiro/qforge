@@ -9,7 +9,9 @@ import Label from "../models/Label.js";
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 const OPENROUTER_DEFAULT_MODEL =
-  process.env.OPENROUTER_MODEL || "arcee-ai/trinity-large-preview:free";
+  process.env.OPENROUTER_MODEL ||
+  process.env.OPENROUTER_FAST_MODEL ||
+  "openrouter/auto";
 
 /**
  * Obtém o provedor de IA (Groq por defeito, senão OpenRouter como fallback)
@@ -163,9 +165,15 @@ export async function generateQuestionsHandler(req, res) {
     console.error("Erro em generateQuestionsHandler:", err);
     const message = err?.message || "Erro ao gerar questões";
     const isTimeout = /(tempo limite|timeout|timed out)/i.test(message);
+    const isCredits = /(insufficient credits|never purchased credits|insufficient balance|quota|payment required|conta openrouter sem créditos)/i.test(
+      message
+    );
+    const normalizedMessage = isCredits
+      ? "Conta OpenRouter sem créditos ativados. Adiciona créditos em https://openrouter.ai/settings/credits ou configura GROQ_API_KEY no backend."
+      : message;
 
-    res.status(isTimeout ? 504 : 500).json({
-      error: message,
+    res.status(isTimeout ? 504 : isCredits ? 402 : 500).json({
+      error: normalizedMessage,
     });
   }
 }

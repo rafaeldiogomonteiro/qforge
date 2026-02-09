@@ -221,6 +221,9 @@
       const chapterTagNames = selectedChapterTags
         .map((id) => availableChapterTags.find((t) => String(t._id) === String(id))?.name)
         .filter(Boolean);
+      const labelNames = selectedLabels
+        .map((id) => availableLabels.find((label) => String(label._id) === String(id))?.name)
+        .filter(Boolean);
 
       const payload = {
         bankId: bankId || undefined,
@@ -230,7 +233,7 @@
         types,
         difficulties,
         chapterTags: chapterTagNames,
-        labels: selectedLabels,
+        labels: labelNames,
         language,
         additionalInstructions,
         saveToBank: Boolean(bankId) // Se tiver banco selecionado, guarda automaticamente

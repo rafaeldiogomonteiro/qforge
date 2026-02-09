@@ -13,6 +13,18 @@ const AI_REQUEST_RETRIES = Number(process.env.AI_REQUEST_RETRIES ?? 0); // nº d
 const AI_RETRY_DELAY_MS = Number(process.env.AI_RETRY_DELAY_MS) || 1_500;
 const AI_MAX_TOKENS = Number(process.env.AI_MAX_TOKENS) || 2_048;
 const OPENROUTER_FAST_MODEL = process.env.OPENROUTER_FAST_MODEL || "";
+const DEFAULT_OPENROUTER_FALLBACK_MODELS = [
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "qwen/qwen-2.5-72b-instruct:free",
+  "mistralai/mistral-small-3.1-24b-instruct:free",
+];
+const OPENROUTER_FALLBACK_MODELS = (
+  process.env.OPENROUTER_FALLBACK_MODELS ||
+  DEFAULT_OPENROUTER_FALLBACK_MODELS.join(",")
+)
+  .split(",")
+  .map((model) => model.trim())
+  .filter(Boolean);
 
 const aiDispatcher = new Agent({
   connect: { timeout: AI_CONNECT_TIMEOUT_MS },
@@ -30,9 +42,37 @@ const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 function isRetriableProviderError(err) {
   const message = String(err?.message || "");
-  return /(tempo limite|timeout|timed out|rate limit|429|502|503|504|overloaded|temporarily unavailable)/i.test(
+  return /(tempo limite|timeout|timed out|rate limit|429|502|503|504|overloaded|temporarily unavailable|provider returned error|upstream error|service unavailable|gateway error)/i.test(
     message
   );
+}
+
+function isModelUnavailableError(err) {
+  const message = String(err?.message || "");
+  return /(model|endpoint).*(not found|not available|unavailable|does not exist|decommissioned|no endpoints)/i.test(
+    message
+  );
+}
+
+function isCreditsError(err) {
+  const message = String(err?.message || "");
+  return /(insufficient credits|insufficient balance|quota|payment required|402)/i.test(
+    message
+  );
+}
+
+function isAccountCreditsNotActivatedError(err) {
+  const message = String(err?.message || "");
+  return /never purchased credits/i.test(message);
+}
+
+function isUnsupportedJsonModeError(err) {
+  const message = String(err?.message || "");
+  const mentionsJsonMode = /(response[_\s-]?format|json[_\s-]?object|structured output)/i.test(
+    message
+  );
+  const mentionsUnsupported = /(unsupported|not support|invalid)/i.test(message);
+  return mentionsJsonMode && mentionsUnsupported;
 }
 
 // Modelos disponíveis no Groq (gratuitos)
@@ -62,8 +102,10 @@ async function callChatAPI(
   model,
   messages,
   temperature = 0.7,
-  maxTokens = AI_MAX_TOKENS
+  maxTokens = AI_MAX_TOKENS,
+  options = {}
 ) {
+  const { forceJsonResponseFormat = true } = options;
   const baseURL =
     provider?.baseURL ||
     (provider?.name === "openrouter" ? OPENROUTER_BASE_URL : GROQ_BASE_URL);
@@ -96,7 +138,9 @@ async function callChatAPI(
           messages,
           temperature,
           max_tokens: maxTokens,
-          response_format: { type: "json_object" },
+          ...(forceJsonResponseFormat
+            ? { response_format: { type: "json_object" } }
+            : {}),
         }),
         dispatcher: aiDispatcher,
         headersTimeout: AI_HEADERS_TIMEOUT_MS,
@@ -289,36 +333,87 @@ export async function generateQuestions(provider, params) {
   ];
 
   let responseText;
-  try {
-    responseText = await callChatAPI(
-      provider,
-      model,
-      messages,
-      0.7,
-      AI_MAX_TOKENS
-    );
-  } catch (err) {
-    const canUseFastFallback =
-      provider?.name === "openrouter" &&
-      OPENROUTER_FAST_MODEL &&
-      OPENROUTER_FAST_MODEL !== model &&
-      isRetriableProviderError(err);
+  const tryModel = async (candidateModel) => {
+    try {
+      return await callChatAPI(
+        provider,
+        candidateModel,
+        messages,
+        0.7,
+        AI_MAX_TOKENS,
+        { forceJsonResponseFormat: true }
+      );
+    } catch (err) {
+      if (!isUnsupportedJsonModeError(err)) {
+        throw err;
+      }
 
-    if (!canUseFastFallback) {
+      console.warn(
+        `[AI] Modelo ${candidateModel} não suporta response_format=json_object. A tentar sem response_format.`
+      );
+      return callChatAPI(provider, candidateModel, messages, 0.7, AI_MAX_TOKENS, {
+        forceJsonResponseFormat: false,
+      });
+    }
+  };
+
+  try {
+    responseText = await tryModel(model);
+  } catch (err) {
+    if (
+      provider?.name === "openrouter" &&
+      isAccountCreditsNotActivatedError(err)
+    ) {
+      throw new Error(
+        "Conta OpenRouter sem créditos ativados. Adiciona créditos em https://openrouter.ai/settings/credits ou configura GROQ_API_KEY no backend."
+      );
+    }
+
+    const canUseModelFallback =
+      provider?.name === "openrouter" &&
+      (isRetriableProviderError(err) ||
+        isModelUnavailableError(err) ||
+        isCreditsError(err));
+
+    if (!canUseModelFallback) {
       throw err;
     }
 
-    console.warn(
-      `[AI] Falha no modelo ${model}. A tentar fallback para ${OPENROUTER_FAST_MODEL}. Motivo: ${err.message}`
-    );
-    model = OPENROUTER_FAST_MODEL;
-    responseText = await callChatAPI(
-      provider,
-      model,
-      messages,
-      0.7,
-      AI_MAX_TOKENS
-    );
+    const fallbackCandidates = [...new Set([
+      OPENROUTER_FAST_MODEL,
+      ...OPENROUTER_FALLBACK_MODELS,
+      "openrouter/auto",
+    ])].filter((candidate) => candidate && candidate !== model);
+
+    if (fallbackCandidates.length === 0) {
+      throw err;
+    }
+
+    let failedModel = model;
+    let lastError = err;
+    for (const candidate of fallbackCandidates) {
+      try {
+        console.warn(
+          `[AI] Falha no modelo ${failedModel}. A tentar fallback para ${candidate}. Motivo: ${lastError.message}`
+        );
+        responseText = await tryModel(candidate);
+        model = candidate;
+        lastError = null;
+        break;
+      } catch (fallbackErr) {
+        if (isAccountCreditsNotActivatedError(fallbackErr)) {
+          throw new Error(
+            "Conta OpenRouter sem créditos ativados. Adiciona créditos em https://openrouter.ai/settings/credits ou configura GROQ_API_KEY no backend."
+          );
+        }
+        failedModel = candidate;
+        lastError = fallbackErr;
+      }
+    }
+
+    if (!responseText) {
+      throw lastError || err;
+    }
   }
 
   // Parse JSON response

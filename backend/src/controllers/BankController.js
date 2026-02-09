@@ -14,9 +14,7 @@ export async function listBanks(req, res) {
   try {
     const userId = req.userId;
 
-    const banks = await QuestionBank.find({
-      $or: [{ owner: userId }, { sharedWith: userId }, { coordinators: userId }]
-    })
+    const banks = await QuestionBank.find({ owner: userId })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -37,8 +35,6 @@ export async function createBank(req, res) {
       discipline,
       academicYear,
       tags,
-      sharedWith,
-      coordinators
     } = req.body || {};
 
     if (!title || !title.trim()) {
@@ -54,14 +50,6 @@ export async function createBank(req, res) {
       owner: req.userId,
       tags: normalizeStringArray(tags)
     };
-
-    if (Array.isArray(sharedWith) && sharedWith.length > 0) {
-      payload.sharedWith = sharedWith;
-    }
-
-    if (Array.isArray(coordinators) && coordinators.length > 0) {
-      payload.coordinators = coordinators;
-    }
 
     const bank = await QuestionBank.create(payload);
 

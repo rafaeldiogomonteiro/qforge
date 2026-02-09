@@ -32,6 +32,8 @@ tmp/
 temp/
 *.pid
 *.pid.lock
+tmpclaude-*-cwd
+nul
 
 # Environment (secrets)
 .env

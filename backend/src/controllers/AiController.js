@@ -93,14 +93,8 @@ export async function generateQuestionsHandler(req, res) {
 
       const userId = String(req.userId);
       const isOwner = String(bank.owner) === userId;
-      const isCoordinator = Array.isArray(bank.coordinators)
-        ? bank.coordinators.map(String).includes(userId)
-        : false;
-      const isShared = Array.isArray(bank.sharedWith)
-        ? bank.sharedWith.map(String).includes(userId)
-        : false;
 
-      if (!isOwner && !isCoordinator && !isShared) {
+      if (!isOwner) {
         return res
           .status(403)
           .json({ error: "Não tens permissão para adicionar questões a este banco" });

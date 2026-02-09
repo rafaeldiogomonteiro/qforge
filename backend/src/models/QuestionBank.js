@@ -14,21 +14,7 @@ const questionBankSchema = new mongoose.Schema(
       required: true,
     },
 
-    sharedWith: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
-
     tags: [{ type: String }],
-
-    coordinators: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
   },
   { timestamps: true }
 );

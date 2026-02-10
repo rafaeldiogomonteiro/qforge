@@ -213,7 +213,7 @@ FORMATO DE RESPOSTA (JSON):
       "type": "MULTIPLE_CHOICE|TRUE_FALSE|SHORT_ANSWER|OPEN",
       "stem": "Enunciado da questão",
       "difficulty": 1,
-      "labels": ["Época Normal"],
+      "labels": [],
       "chapterTags": ["HTML", "CSS"],
       "options": [
         { "text": "Opção A", "isCorrect": false },
@@ -231,7 +231,7 @@ NOTAS:
 - "options" só é usado em MULTIPLE_CHOICE e TRUE_FALSE
 - "acceptableAnswers" só é usado em SHORT_ANSWER e OPEN
 - "difficulty" deve ser um inteiro: 1=Básico, 2=Normal, 3=Difícil, 4=Muito Difícil
-- "labels" deve ser array de strings descritivas como ["Época Normal", "Recurso", "Exame Final"]
+- "labels" é definido pelo utilizador fora da IA; devolve sempre array (pode ser vazio), sem inventar labels
 - "chapterTags" deve ser array de strings com tópicos/conceitos relevantes (ex: ["HTML", "CSS", "JavaScript"])
   IMPORTANTE: Os chapterTags devem ser nomes descritivos e específicos do conteúdo/tópico da questão
   Não uses IDs ou códigos, apenas nomes legíveis como "Programação Linear", "Método Simplex", "HTML Básico", etc.
@@ -308,6 +308,7 @@ export async function generateQuestions(provider, params) {
     numQuestions = 5,
     types = ["MULTIPLE_CHOICE"],
     difficulties = [2],
+    labels = [],
     chapterTags = [],
     additionalInstructions = "",
   } = params;
@@ -447,6 +448,7 @@ export async function generateQuestions(provider, params) {
       .map((v) => (typeof v === "string" ? v.trim() : ""))
       .filter(Boolean);
   };
+  const providedLabels = asStringArray(labels);
 
   const questions = parsed.questions.map((q, idx) => {
     const fallbackDifficulty =
@@ -467,7 +469,7 @@ export async function generateQuestions(provider, params) {
         ? q.acceptableAnswers
         : [],
       difficulty,
-      labels: asStringArray(q.labels),
+      labels: [...providedLabels],
       chapterTags: finalChapterTags,
       explanation: q.explanation || "",
       source: "AI",

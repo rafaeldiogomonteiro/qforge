@@ -61,6 +61,11 @@ export async function generateQuestionsHandler(req, res) {
       additionalInstructions = "",
       saveToBank = false,
     } = req.body;
+    const userProvidedLabels = Array.isArray(labels)
+      ? labels
+          .map((name) => (typeof name === "string" ? name.trim() : ""))
+          .filter(Boolean)
+      : [];
 
     // Validação básica
     if (!topic && !content) {
@@ -103,6 +108,7 @@ export async function generateQuestionsHandler(req, res) {
       numQuestions,
       types,
       difficulties,
+      labels: userProvidedLabels,
       chapterTags,
       language,
       additionalInstructions,
@@ -122,7 +128,8 @@ export async function generateQuestionsHandler(req, res) {
             : Array.isArray(q.chapterTags) && q.chapterTags.length > 0
             ? q.chapterTags
             : [];
-        const finalLabels = Array.isArray(q.labels) && q.labels.length > 0 ? q.labels : labels;
+        // Labels são sempre as fornecidas pelo utilizador; se não houver, mantém vazio.
+        const finalLabels = userProvidedLabels;
 
         console.log(`[AI] Processando chapter tags para questão:`, finalChapterTags);
         console.log(`[AI] Processando labels para questão:`, finalLabels);

@@ -5,13 +5,7 @@ import { defineConfig } from 'vite';
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	server: {
-		host: '0.0.0.0',
-		allowedHosts: ['qforge.maruqes.com'],
-		hmr: {
-			protocol: 'wss',
-			host: 'qforge.maruqes.com',
-			clientPort: 443
-		}
+		host: '0.0.0.0'
 	},
 	preview: {
 		host: '0.0.0.0'

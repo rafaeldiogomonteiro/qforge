@@ -104,10 +104,15 @@
     }
   }
 
-  onMount(() => {
+  onMount(async () => {
     loadDraft();
     autosaveReady = true;
-    loadBanks();
+    try {
+      await loadBanks();
+    } catch (err) {
+      console.error("Erro ao carregar dados iniciais:", err);
+      error = "Falha ao carregar dados. Por favor, verifique se está autenticado.";
+    }
   });
 
   $: autosaveReady &&
@@ -303,402 +308,255 @@
   }
 </script>
 
-<div style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px;">
+<div style="display: flex; flex-direction: column; gap: 24px;">
+  <!-- Header -->
   <div>
-    <h2 style="margin:0;">Geração de questões (IA)</h2>
-    <p style="margin:6px 0 0; color: var(--muted);">
-      Gera questões por tema/conteúdo, com tipos e dificuldades configuráveis.
+    <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #1e293b;">Gerar Questões com IA</h1>
+    <p style="margin: 6px 0 0; font-size: 14px; color: #64748b;">
+      Utilize inteligência artificial para criar questões personalizadas
     </p>
   </div>
-</div>
 
-<div style="margin-top: 16px; display:grid; grid-template-columns: 1fr; gap: 16px;">
-  <!-- FORM -->
-  <div style="background:white; border:1px solid var(--border); border-radius:14px; padding:16px;">
-    <form on:submit|preventDefault={generate} style="display:grid; gap: 12px;">
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+    <!-- Left Column: Form -->
+    <div style={generated.length > 0 ? "display: none;" : "display: flex; flex-direction: column;"}>
+      <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 18px;">
+        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">✨ Configuração</h3>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">Nº questões</label>
+            <input
+              type="number"
+              min="1"
+              max="50"
+              bind:value={numQuestions}
+              style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px;"
+            />
+          </div>
+
+          <div>
+            <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">Idioma</label>
+            <select bind:value={language} style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; background: white;">
+              <option value="pt-PT">pt-PT</option>
+              <option value="en">en</option>
+              <option value="pt-BR">pt-BR</option>
+            </select>
+          </div>
+        </div>
+
         <div>
-          <label style="font-size: 13px; color: var(--muted);">Nº questões</label>
+          <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">Tema</label>
           <input
-            type="number"
-            min="1"
-            max="50"
-            bind:value={numQuestions}
-            style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
+            bind:value={topic}
+            placeholder="ex.: Programação Linear — Método Simplex"
+            style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px;"
           />
         </div>
 
         <div>
-          <label style="font-size: 13px; color: var(--muted);">Idioma</label>
-          <select bind:value={language} style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;">
-            <option value="pt-PT">pt-PT</option>
-            <option value="en">en</option>
-            <option value="pt-BR">pt-BR</option>
-          </select>
-        </div>
-      </div>
-
-      <div>
-        <label style="font-size: 13px; color: var(--muted);">Tema</label>
-        <input
-          bind:value={topic}
-          placeholder="ex.: Programação Linear — Método Simplex"
-          style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
-        />
-      </div>
-
-      <div>
-        <label style="font-size: 13px; color: var(--muted);">Conteúdo (opcional)</label>
-        <textarea
-          bind:value={content}
-          rows="4"
-          placeholder="Cola aqui matéria / resumo / excerto do manual..."
-          style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
-        />
-      </div>
-
-      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-        <div>
-          <label style="font-size: 13px; color: var(--muted); margin-bottom: 6px; display: block;">Tipos de Questões</label>
-          <div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: white;">
-            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
-              <input
-                type="checkbox"
-                value="MULTIPLE_CHOICE"
-                checked={types.includes("MULTIPLE_CHOICE")}
-                on:change={(e) => {
-                  if (e.target.checked) {
-                    types = [...types, "MULTIPLE_CHOICE"];
-                  } else {
-                    types = types.filter(t => t !== "MULTIPLE_CHOICE");
-                  }
-                }}
-                style="width: 16px; height: 16px;"
-              />
-              <span style="font-size: 14px;">📝 Escolha múltipla</span>
-            </label>
-            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
-              <input
-                type="checkbox"
-                value="TRUE_FALSE"
-                checked={types.includes("TRUE_FALSE")}
-                on:change={(e) => {
-                  if (e.target.checked) {
-                    types = [...types, "TRUE_FALSE"];
-                  } else {
-                    types = types.filter(t => t !== "TRUE_FALSE");
-                  }
-                }}
-                style="width: 16px; height: 16px;"
-              />
-              <span style="font-size: 14px;">✓✗ Verdadeiro/Falso</span>
-            </label>
-            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
-              <input
-                type="checkbox"
-                value="SHORT_ANSWER"
-                checked={types.includes("SHORT_ANSWER")}
-                on:change={(e) => {
-                  if (e.target.checked) {
-                    types = [...types, "SHORT_ANSWER"];
-                  } else {
-                    types = types.filter(t => t !== "SHORT_ANSWER");
-                  }
-                }}
-                style="width: 16px; height: 16px;"
-              />
-              <span style="font-size: 14px;">✍️ Resposta curta</span>
-            </label>
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-              <input
-                type="checkbox"
-                value="OPEN"
-                checked={types.includes("OPEN")}
-                on:change={(e) => {
-                  if (e.target.checked) {
-                    types = [...types, "OPEN"];
-                  } else {
-                    types = types.filter(t => t !== "OPEN");
-                  }
-                }}
-                style="width: 16px; height: 16px;"
-              />
-              <span style="font-size: 14px;">📄 Aberta</span>
-            </label>
-          </div>
+          <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">Conteúdo (opcional)</label>
+          <textarea
+            bind:value={content}
+            rows="4"
+            placeholder="Cola aqui matéria / resumo / excerto do manual..."
+            style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; font-family: inherit;"
+          />
         </div>
 
-        <div>
-          <label style="font-size: 13px; color: var(--muted); margin-bottom: 6px; display: block;">Níveis de Dificuldade</label>
-          <div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: white;">
-            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
-              <input
-                type="checkbox"
-                value={1}
-                checked={difficulties.includes(1)}
-                on:change={(e) => {
-                  if (e.target.checked) {
-                    difficulties = [...difficulties, 1];
-                  } else {
-                    difficulties = difficulties.filter(d => d !== 1);
-                  }
-                }}
-                style="width: 16px; height: 16px;"
-              />
-              <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #ecfeff; border: 1px solid #a5f3fc;">1 - Básico</span>
-            </label>
-            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
-              <input
-                type="checkbox"
-                value={2}
-                checked={difficulties.includes(2)}
-                on:change={(e) => {
-                  if (e.target.checked) {
-                    difficulties = [...difficulties, 2];
-                  } else {
-                    difficulties = difficulties.filter(d => d !== 2);
-                  }
-                }}
-                style="width: 16px; height: 16px;"
-              />
-              <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #f0fdf4; border: 1px solid #bbf7d0;">2 - Normal</span>
-            </label>
-            <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
-              <input
-                type="checkbox"
-                value={3}
-                checked={difficulties.includes(3)}
-                on:change={(e) => {
-                  if (e.target.checked) {
-                    difficulties = [...difficulties, 3];
-                  } else {
-                    difficulties = difficulties.filter(d => d !== 3);
-                  }
-                }}
-                style="width: 16px; height: 16px;"
-              />
-              <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #fffbeb; border: 1px solid #fde68a;">3 - Difícil</span>
-            </label>
-            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-              <input
-                type="checkbox"
-                value={4}
-                checked={difficulties.includes(4)}
-                on:change={(e) => {
-                  if (e.target.checked) {
-                    difficulties = [...difficulties, 4];
-                  } else {
-                    difficulties = difficulties.filter(d => d !== 4);
-                  }
-                }}
-                style="width: 16px; height: 16px;"
-              />
-              <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #fef2f2; border: 1px solid #fecaca;">4 - Muito Difícil</span>
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- Etiquetas -->
-      <div>
-        <button
-          type="button"
-          class="btn"
-          on:click={() => (showLabelsBox = !showLabelsBox)}
-          style="width: 100%; justify-content: space-between; display: flex; align-items: center;"
-        >
-          <span>Etiquetas (opcional){#if selectedLabels.length > 0} — {selectedLabels.length} selecionada(s){/if}</span>
-          <span style="font-size: 12px; color: var(--muted);">{showLabelsBox ? "Esconder ▲" : "Mostrar ▼"}</span>
-        </button>
-
-        {#if showLabelsBox}
-          <div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px; max-height: 180px; overflow-y: auto; background: white; margin-top: 6px;">
-            {#if availableLabels.length === 0}
-              <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma etiqueta disponível. <a href="/app/labels" style="color: #1d4ed8;">Criar etiquetas</a></p>
-            {:else}
-              <div style="display: grid; gap: 8px;">
-                {#each availableLabels as label}
-                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px; border-radius: 8px; transition: background 0.2s;" class="checkbox-hover">
-                    <input
-                      type="checkbox"
-                      value={label._id}
-                      checked={selectedLabels.includes(label._id)}
-                      on:change={(e) => {
-                        if (e.target.checked) {
-                          selectedLabels = [...selectedLabels, label._id];
-                        } else {
-                          selectedLabels = selectedLabels.filter(id => id !== label._id);
-                        }
-                      }}
-                      style="width: 16px; height: 16px;"
-                    />
-                    <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #ecfeff; border: 1px solid #a5f3fc;">
-                      🏷️ {label.name}
-                    </span>
-                  </label>
-                {/each}
-              </div>
-            {/if}
-          </div>
-        {/if}
-      </div>
-
-      <!-- Capítulos -->
-      <div>
-        <button
-          type="button"
-          class="btn"
-          on:click={() => (showChapterTagsBox = !showChapterTagsBox)}
-          style="width: 100%; justify-content: space-between; display: flex; align-items: center;"
-        >
-          <span>Capítulos (opcional){#if selectedChapterTags.length > 0} — {selectedChapterTags.length} selecionada(s){/if}</span>
-          <span style="font-size: 12px; color: var(--muted);">{showChapterTagsBox ? "Esconder ▲" : "Mostrar ▼"}</span>
-        </button>
-
-        {#if showChapterTagsBox}
-          <div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px; max-height: 220px; overflow-y: auto; background: white; margin-top: 6px; display: grid; gap: 10px;">
-            {#if availableChapterTags.length === 0}
-              <p style="color: var(--muted); margin: 0; font-size: 13px;">Nenhuma capítulo disponível. <a href="/app/chapter-tags" style="color: #7c3aed;">Criar etiquetas</a></p>
-            {:else}
-              {#each groupedChapterTags as group}
-                {#if group}
-                  <div style="border: 1px solid var(--border); border-radius: 10px; padding: 10px;">
-                    <button
-                      type="button"
-                      on:click={() => toggleChapterFolder(group.folder?._id || "")}
-                      style="width:100%; display:flex; justify-content: space-between; align-items:center; gap:8px; background:none; border:none; cursor:pointer;"
-                    >
-                      <strong style="font-size: 14px; display:flex; align-items:center; gap:6px;">
-                        {group.folder ? "📂" : "📁"} {group.folder ? group.folder.name : "Sem pasta"} ({(group.tags || []).length})
-                      </strong>
-                      <span style="font-size:12px; color: var(--muted);">{chapterFoldersOpen.has(group.folder?._id || "__none__") ? "▲" : "▼"}</span>
-                    </button>
-
-                    {#if chapterFoldersOpen.has(group.folder?._id || "__none__")}
-                      {#if (group.tags || []).length === 0}
-                        <div style="color: var(--muted); font-size: 13px; margin-top:6px;">Sem etiquetas nesta pasta.</div>
-                      {:else}
-                        <div style="display: grid; gap: 6px; margin-top:8px;">
-                          {#each group.tags as tag}
-                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px; border-radius: 8px; transition: background 0.2s;" class="checkbox-hover">
-                              <input
-                                type="checkbox"
-                                value={tag._id}
-                                checked={selectedChapterTags.includes(tag._id)}
-                                on:change={(e) => {
-                                  if (e.target.checked) {
-                                    selectedChapterTags = [...selectedChapterTags, tag._id];
-                                  } else {
-                                    selectedChapterTags = selectedChapterTags.filter(id => id !== tag._id);
-                                  }
-                                }}
-                                style="width: 16px; height: 16px;"
-                              />
-                          <span style="font-size: 14px; padding: 4px 10px; border-radius: 999px; background: #f5f3ff; border: 1px solid #c4b5fd;">
-                            📌 {tag.name}
-                          </span>
-                          <span style="font-size: 12px; color: var(--muted);">
-                            {group.folder ? group.folder.name : "Sem pasta"}
-                          </span>
-                            </label>
-                          {/each}
-                        </div>
-                      {/if}
-                    {/if}
-                  </div>
-                {/if}
-              {/each}
-            {/if}
-          </div>
-        {/if}
-      </div>
-
-      <div>
-        <label style="font-size: 13px; color: var(--muted);">Instruções adicionais</label>
-        <textarea
-          bind:value={additionalInstructions}
-          rows="3"
-          placeholder="ex.: evita perguntas demasiado teóricas; inclui 1 exemplo numérico..."
-          style="width:100%; margin-top:6px; padding:10px; border:1px solid var(--border); border-radius:10px;"
-        />
-      </div>
-
-      {#if error}
-        <div style="color:#b91c1c; font-size:14px;">{error}</div>
-      {/if}
-
-      <div style="display:flex; gap:10px;">
-        <button class="btn" type="button" on:click={openConfirmModal} disabled={generating} style="padding:10px 14px;">
-          {generating ? "A gerar..." : "Gerar"}
-        </button>
-
-      </div>
-    </form>
-  </div>
-
-  <!-- PREVIEW -->
-  <div style="background:white; border:1px solid var(--border); border-radius:14px; padding:16px;">
-    <h3 style="margin:0 0 10px 0;">Pré-visualização</h3>
-
-    {#if generated.length === 0}
-      <p style="margin:0; color: var(--muted);">Ainda não geraste questões.</p>
-    {:else}
-      <div style="display:grid; gap: 12px;">
-        {#each generated as q}
-          <div style="border:1px solid var(--border); border-radius:12px; padding:14px;">
-            <div style="display:flex; justify-content:space-between; gap: 12px;">
-              <div style="font-weight:600;">{typeLabel(q.type)} • D {q.difficulty}/4</div>
-              <div style="font-size:13px; color: var(--muted);">{sourceLabel(q.source || "AI")}</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div>
+            <label style="font-size: 13px; color: #64748b; margin-bottom: 8px; display: block;">Tipos de Questões</label>
+            <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: white; display: flex; flex-direction: column; gap: 8px;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
+                <input
+                  type="checkbox"
+                  value="MULTIPLE_CHOICE"
+                  checked={types.includes("MULTIPLE_CHOICE")}
+                  on:change={(e) => {
+                    if (e.target.checked) {
+                      types = [...types, "MULTIPLE_CHOICE"];
+                    } else {
+                      types = types.filter(t => t !== "MULTIPLE_CHOICE");
+                    }
+                  }}
+                  style="width: 16px; height: 16px; cursor: pointer;"
+                />
+                <span>📝 Escolha múltipla</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
+                <input
+                  type="checkbox"
+                  value="TRUE_FALSE"
+                  checked={types.includes("TRUE_FALSE")}
+                  on:change={(e) => {
+                    if (e.target.checked) {
+                      types = [...types, "TRUE_FALSE"];
+                    } else {
+                      types = types.filter(t => t !== "TRUE_FALSE");
+                    }
+                  }}
+                  style="width: 16px; height: 16px; cursor: pointer;"
+                />
+                <span>✓✗ V/F</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
+                <input
+                  type="checkbox"
+                  value="SHORT_ANSWER"
+                  checked={types.includes("SHORT_ANSWER")}
+                  on:change={(e) => {
+                    if (e.target.checked) {
+                      types = [...types, "SHORT_ANSWER"];
+                    } else {
+                      types = types.filter(t => t !== "SHORT_ANSWER");
+                    }
+                  }}
+                  style="width: 16px; height: 16px; cursor: pointer;"
+                />
+                <span>✍️ Resposta curta</span>
+              </label>
             </div>
-
-            <div style="margin-top:8px;">{q.stem}</div>
-
-            {#if q.type === "MULTIPLE_CHOICE" || q.type === "TRUE_FALSE"}
-              <ul style="margin-top:8px; padding-left: 18px;">
-                {#each (q.options || []) as opt}
-                  <li style="color: {opt.isCorrect ? '#15803d' : 'inherit'};">
-                    {opt.text}
-                  </li>
-                {/each}
-              </ul>
-            {/if}
-
-            {#if q.type === "SHORT_ANSWER"}
-              <div style="margin-top:8px; color: var(--muted); font-size: 13px;">
-                Respostas aceitáveis: {(q.acceptableAnswers || []).join(", ")}
-              </div>
-            {/if}
           </div>
-        {/each}
-      </div>
 
-      <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
-        <button class="btn btn-confirm" type="button" on:click={openSaveToBankModal}>
-          💾 Guardar no banco
+          <div>
+            <label style="font-size: 13px; color: #64748b; margin-bottom: 8px; display: block;">Dificuldade</label>
+            <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: white; display: flex; flex-direction: column; gap: 8px;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px;">
+                <input
+                  type="checkbox"
+                  value={1}
+                  checked={difficulties.includes(1)}
+                  on:change={(e) => {
+                    if (e.target.checked) {
+                      difficulties = [...difficulties, 1];
+                    } else {
+                      difficulties = difficulties.filter(d => d !== 1);
+                    }
+                  }}
+                  style="width: 16px; height: 16px; cursor: pointer;"
+                />
+                <span style="padding: 2px 8px; border-radius: 12px; background: #ecfeff; border: 1px solid #a5f3fc;">Básico</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px;">
+                <input
+                  type="checkbox"
+                  value={2}
+                  checked={difficulties.includes(2)}
+                  on:change={(e) => {
+                    if (e.target.checked) {
+                      difficulties = [...difficulties, 2];
+                    } else {
+                      difficulties = difficulties.filter(d => d !== 2);
+                    }
+                  }}
+                  style="width: 16px; height: 16px; cursor: pointer;"
+                />
+                <span style="padding: 2px 8px; border-radius: 12px; background: #f0fdf4; border: 1px solid #bbf7d0;">Normal</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px;">
+                <input
+                  type="checkbox"
+                  value={3}
+                  checked={difficulties.includes(3)}
+                  on:change={(e) => {
+                    if (e.target.checked) {
+                      difficulties = [...difficulties, 3];
+                    } else {
+                      difficulties = difficulties.filter(d => d !== 3);
+                    }
+                  }}
+                  style="width: 16px; height: 16px; cursor: pointer;"
+                />
+                <span style="padding: 2px 8px; border-radius: 12px; background: #fffbeb; border: 1px solid #fde68a;">Difícil</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {#if error}
+          <div style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; color: #991b1b; font-size: 13px;">
+            {error}
+          </div>
+        {/if}
+
+        <button
+          style="padding: 12px 16px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.15s;"
+          type="button"
+          on:click={openConfirmModal}
+          disabled={generating}
+        >
+          {generating ? "A gerar..." : "✨ Gerar"}
         </button>
       </div>
-    {/if}
+    </div>
+
+    <!-- Right Column: Results -->
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; flex-direction: column;">
+      <h3 style="margin: 0 0 18px 0; font-size: 16px; font-weight: 600; color: #1e293b;">📋 Resultados</h3>
+
+      {#if generated.length === 0}
+        <p style="margin: 0; color: #64748b; font-size: 14px;">Gera questões para ver a pré-visualização aqui...</p>
+      {:else}
+        <div style="display: flex; flex-direction: column; gap: 12px; flex: 1; overflow-y: auto; max-height: 600px;">
+          {#each generated as q}
+            <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #f8fafc;">
+              <div style="font-weight: 600; font-size: 13px; color: #1e293b; margin-bottom: 8px;">
+                {typeLabel(q.type)} • D {q.difficulty}/4
+              </div>
+              <div style="font-size: 13px; color: #1e293b; line-height: 1.5;">{q.stem}</div>
+
+              {#if q.type === "MULTIPLE_CHOICE" || q.type === "TRUE_FALSE"}
+                <ul style="margin: 8px 0 0; padding-left: 18px; font-size: 12px;">
+                  {#each (q.options || []) as opt}
+                    <li style="color: {opt.isCorrect ? '#10b981' : '#1e293b'}; margin: 4px 0;">
+                      {opt.text}
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            </div>
+          {/each}
+        </div>
+
+        <div style="margin-top: 16px; display: flex; gap: 10px;">
+          <button
+            style="flex: 1; padding: 12px 16px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 14px; transition: all 0.15s;"
+            type="button"
+            on:click={() => (generated = [])}
+          >
+            ← Voltar
+          </button>
+          <button
+            style="flex: 1; padding: 12px 16px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.15s;"
+            type="button"
+            on:click={openSaveToBankModal}
+          >
+            💾 Guardar
+          </button>
+        </div>
+      {/if}
+    </div>
   </div>
-</div>
 
 <!-- Confirmation Modal -->
 {#if showConfirmModal}
-  <div class="modal-overlay" on:click={closeConfirmModal}>
-    <div class="modal-content" on:click|stopPropagation>
-      <h3 style="margin: 0 0 16px 0; font-size: 18px;">Confirmar Geração</h3>
-      <p style="margin: 0 0 24px 0; color: var(--muted); line-height: 1.5;">
+  <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;" on:click={closeConfirmModal}>
+    <div style="background: white; border-radius: 12px; padding: 24px; max-width: 500px; width: 90%; box-shadow: 0 20px 25px rgba(0, 0, 0, 0.1);" on:click|stopPropagation>
+      <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #1e293b;">Confirmar Geração</h3>
+      <p style="margin: 0 0 24px 0; color: #64748b; line-height: 1.5; font-size: 14px;">
         Tem a certeza que deseja gerar {numQuestions} {numQuestions === 1 ? 'questão' : 'questões'} com IA?
         {#if bankId}
-          <br/><strong style="color: var(--text);">As questões serão guardadas no banco selecionado.</strong>
+          <br/><strong style="color: #1e293b;">As questões serão guardadas no banco selecionado.</strong>
         {/if}
       </p>
       <div style="display: flex; gap: 12px; justify-content: flex-end;">
-        <button class="btn" type="button" on:click={closeConfirmModal}>
+        <button style="padding: 10px 16px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 14px;" type="button" on:click={closeConfirmModal}>
           Cancelar
         </button>
-        <button 
-          class="btn btn-confirm" 
-          type="button" 
+        <button
+          style="padding: 10px 16px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;"
+          type="button"
           on:click={confirmAndGenerate}
         >
           Confirmar
@@ -710,34 +568,34 @@
 
 <!-- Save to Bank Modal -->
 {#if showSaveToBankModal}
-  <div class="modal-overlay" on:click={closeSaveToBankModal}>
-    <div class="modal-content" on:click|stopPropagation>
-      <h3 style="margin: 0 0 16px 0; font-size: 18px;">Guardar no banco</h3>
-      <p style="margin: 0 0 12px 0; color: var(--muted); line-height: 1.5;">
+  <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;" on:click={closeSaveToBankModal}>
+    <div style="background: white; border-radius: 12px; padding: 24px; max-width: 500px; width: 90%; box-shadow: 0 20px 25px rgba(0, 0, 0, 0.1);" on:click|stopPropagation>
+      <h3 style="margin: 0 0 16px 0; font-size: 18px; font-weight: 600; color: #1e293b;">Guardar no banco</h3>
+      <p style="margin: 0 0 12px 0; color: #64748b; line-height: 1.5; font-size: 14px;">
         Seleciona o banco onde pretendes guardar as {generated.length} {generated.length === 1 ? 'questão' : 'questões'}:
       </p>
-      
-      <select 
+
+      <select
         bind:value={selectedBankForSave}
-        style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 20px;"
+        style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 20px; font-size: 14px; background: white;"
       >
         <option value="">-- Selecionar banco --</option>
         {#each banks as bank}
           <option value={bank._id}>{bank.title}</option>
         {/each}
       </select>
-      
+
       {#if error}
-        <div style="color: #b91c1c; font-size: 14px; margin-bottom: 16px;">{error}</div>
+        <div style="color: #991b1b; background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; font-size: 14px; margin-bottom: 16px;">{error}</div>
       {/if}
-      
+
       <div style="display: flex; gap: 12px; justify-content: flex-end;">
-        <button class="btn" type="button" on:click={closeSaveToBankModal} disabled={savingToBank}>
+        <button style="padding: 10px 16px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 14px;" type="button" on:click={closeSaveToBankModal} disabled={savingToBank}>
           Cancelar
         </button>
-        <button 
-          class="btn btn-confirm" 
-          type="button" 
+        <button
+          style="padding: 10px 16px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; opacity: {savingToBank || !selectedBankForSave ? '0.5' : '1'};"
+          type="button"
           on:click={saveQuestionsToBank}
           disabled={savingToBank || !selectedBankForSave}
         >
@@ -748,74 +606,10 @@
   </div>
 {/if}
 
+</div>
+
 <style>
-  .btn {
-    padding: 10px 16px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: white;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.15s;
-  }
-
-  .btn:hover:not(:disabled) {
-    background: #f9fafb;
-    border-color: #9ca3af;
-  }
-
-  .btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-  
-  .btn-confirm {
-    background: #3b82f6 !important;
-    color: white !important;
-    border-color: #3b82f6 !important;
-  }
-  
-  .btn-confirm:hover:not(:disabled) {
-    background: #2563eb !important;
-    border-color: #2563eb !important;
-  }
-  
-  .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    backdrop-filter: blur(4px);
-  }
-  
-  .modal-content {
-    background: white;
-    border-radius: 16px;
-    padding: 24px;
-    max-width: 500px;
-    width: 90%;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    animation: modalFadeIn 0.2s ease-out;
-  }
-  
-  @keyframes modalFadeIn {
-    from {
-      opacity: 0;
-      transform: scale(0.95);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-
   .checkbox-hover:hover {
-    background: #f3f4f6;
+    background: #f8fafc;
   }
 </style>

@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '../.env') });
 import express from "express";
 import cors from "cors";
-import { connectDB } from "./config/db.js";
+import { connectDB, disconnectDB } from "./config/db.js";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./config/swagger.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -17,6 +17,7 @@ import questionRoutes from "./routes/questionRoutes.js";
 import labelRoutes from "./routes/labelRoutes.js";
 import chapterTagRoutes from "./routes/chapterTagRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
+import auditRoutes from "./routes/auditRoutes.js";
 import folderRoutes from "./routes/folderRoutes.js";
 import User from "./models/User.js";
 import Label from "./models/Label.js";
@@ -43,7 +44,11 @@ const defaultAllowedOrigins = [
   "https://www.qforge.maruqes.com",
   "https://qforge-backend.maruqes.com",
   "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
   "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174",
+  "http://127.0.0.1:5175",
 ];
 
 const envAllowedOrigins = (process.env.ALLOWED_ORIGINS || "")
@@ -90,6 +95,7 @@ app.use("/labels", labelRoutes);
 app.use("/chapter-tags", chapterTagRoutes);
 app.use("/folders", folderRoutes);
 app.use("/ai", aiRoutes);
+app.use("/audit-logs", auditRoutes);
 
 // Rota de health check
 app.get("/health", (req, res) => {
@@ -122,8 +128,28 @@ async function start() {
       console.error("❌ Erro ao iniciar o servidor:", err.message);
       process.exit(1);
     });
+
+    // Graceful shutdown
+    process.on("SIGINT", async () => {
+      console.log("\n🛑 Encerrando servidor...");
+      server.close(async () => {
+        await disconnectDB();
+        console.log("✅ Servidor encerrado");
+        process.exit(0);
+      });
+    });
+
+    process.on("SIGTERM", async () => {
+      console.log("\n🛑 Encerrando servidor...");
+      server.close(async () => {
+        await disconnectDB();
+        console.log("✅ Servidor encerrado");
+        process.exit(0);
+      });
+    });
   } catch (err) {
     console.error("❌ Erro ao ligar à base de dados:", err.message);
+    await disconnectDB();
     process.exit(1);
   }
 }

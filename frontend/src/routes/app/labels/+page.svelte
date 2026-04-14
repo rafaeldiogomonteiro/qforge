@@ -128,153 +128,148 @@
   $: filteredLabels = labels;
 </script>
 
-<div style="max-width: 1000px; margin: 0 auto;">
+<div style="display: flex; flex-direction: column; gap: 24px;">
   <!-- Header -->
-  <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px;">
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
-      <div>
-        <h2 style="margin: 0;">Gestão de etiquetas</h2>
-        <p style="margin: 6px 0 0; color: var(--muted); font-size: 14px;">
-          Cria e gere etiquetas para organizar questões (ex.: "Época Normal", "Exame Final")
-        </p>
-      </div>
-      <button class="btn" on:click={startCreate} disabled={isCreating || editingId}>
-        + Nova etiqueta
-      </button>
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+    <div>
+      <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #1e293b;">Etiquetas</h1>
+      <p style="margin: 6px 0 0; font-size: 14px; color: #64748b;">
+        Gerir etiquetas para categorizar questões
+      </p>
     </div>
-
-    <!-- Filter -->
-    <div style="margin-top: 16px; display: flex; align-items: center; gap: 10px;">
-      <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer;">
-        <input type="checkbox" bind:checked={showInactive} on:change={loadLabels} />
-        Mostrar inativas
-      </label>
+    <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+      <button
+        style="padding: 10px 16px; background: {showInactive ? '#2563eb' : 'white'}; color: {showInactive ? 'white' : '#1e293b'}; border: 1px solid {showInactive ? '#2563eb' : '#e2e8f0'}; border-radius: 8px; cursor: pointer; font-size: 14px; transition: all 0.2s;"
+        on:click={() => { showInactive = !showInactive; loadLabels(); }}
+      >
+        Mostrar Inativas
+      </button>
+      <button
+        class="btn"
+        on:click={startCreate}
+        disabled={isCreating || editingId}
+        style="padding: 10px 16px; background: #2563eb; color: white; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; transition: background 0.2s; display: flex; align-items: center; gap: 6px;"
+      >
+        ➕ Criar Etiqueta
+      </button>
     </div>
   </div>
 
   {#if error}
-    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 14px; padding: 16px; margin-bottom: 16px; color: #b91c1c;">
+    <div style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 12px; padding: 16px; color: #991b1b; font-size: 14px;">
       {error}
     </div>
   {/if}
 
+  <!-- List de Etiquetas -->
+  <div style="display: flex; flex-direction: column; gap: 12px;">
+
   <!-- Create/Edit Form -->
   {#if isCreating || editingId}
-    <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px;">
-      <h3 style="margin: 0 0 16px 0;">{editingId ? "Editar etiqueta" : "Nova etiqueta"}</h3>
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+      <h2 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600; color: #1e293b;">
+        {editingId ? "Editar Etiqueta" : "Criar Nova Etiqueta"}
+      </h2>
 
       <form on:submit|preventDefault={submitForm}>
-        <div style="margin-bottom: 16px;">
-          <label style="font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px;">
-            Nome da etiqueta
-          </label>
-          <input
-            bind:value={formName}
-            type="text"
-            placeholder="ex: Época Normal"
-            disabled={formLoading}
-            style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 10px;"
-          />
-        </div>
-
-        {#if formError}
-          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; margin-bottom: 16px; color: #b91c1c; font-size: 14px;">
-            {formError}
+        <div style="display: grid; gap: 12px;">
+          <div>
+            <label style="font-size: 14px; color: #1e293b; display: block; margin-bottom: 6px; font-weight: 500;">
+              Nome *
+            </label>
+            <input
+              bind:value={formName}
+              type="text"
+              placeholder="ex: Época Normal"
+              disabled={formLoading}
+              style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px;"
+            />
           </div>
-        {/if}
 
-        <div style="display: flex; gap: 10px;">
-          <button type="submit" class="btn" disabled={formLoading}>
-            {formLoading ? "A guardar..." : "Guardar"}
-          </button>
-          <button type="button" class="btn" on:click={cancelForm} disabled={formLoading}>
-            Cancelar
-          </button>
+          {#if formError}
+            <div style="background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 8px; font-size: 13px;">
+              {formError}
+            </div>
+          {/if}
+
+          <div style="display: flex; gap: 10px; padding-top: 8px;">
+            <button type="submit" style="padding: 10px 20px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500;">
+              {formLoading ? "A guardar..." : "Guardar"}
+            </button>
+            <button type="button" on:click={cancelForm} disabled={formLoading} style="padding: 10px 20px; background: white; color: #1e293b; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 14px;">
+              Cancelar
+            </button>
+          </div>
         </div>
       </form>
     </div>
   {/if}
 
-  <!-- List -->
-  <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
-    <h3 style="margin: 0 0 16px 0;">
-      Etiquetas ({filteredLabels.length})
-    </h3>
+  {#if loading}
+    <p style="color: #64748b; text-align: center; padding: 32px;">A carregar etiquetas…</p>
+  {:else if filteredLabels.length === 0}
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 48px 24px; text-align: center;">
+      <p style="font-size: 16px; color: #1e293b; margin: 0 0 8px 0;">Nenhuma etiqueta encontrada</p>
+      <p style="font-size: 14px; color: #64748b; margin: 0;">
+        {#if filteredLabels.length === 0 && !showInactive}
+          Crie a sua primeira etiqueta para começar
+        {:else}
+          Tente outra pesquisa
+        {/if}
+      </p>
+    </div>
+  {:else}
+    {#each filteredLabels as label}
+      <div
+        style="
+          background: white;
+          border: 1px solid #e2e8f0;
+          border-radius: 12px;
+          padding: 16px;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 16px;
+          {!label.isActive ? 'opacity: 0.6; background: #f8fafc;' : ''}
+        "
+      >
+        <div style="flex: 1;">
+          <h3 style="margin: 0 0 4px 0; font-size: 15px; font-weight: 600; color: #1e293b;">
+            🏷️ {label.name}
+          </h3>
+          {#if !label.isActive}
+            <div style="font-size: 12px; color: #ef4444; margin-top: 4px;">Inativa</div>
+          {/if}
+        </div>
 
-    {#if loading}
-      <p style="color: var(--muted); margin: 0;">A carregar...</p>
-    {:else if filteredLabels.length === 0}
-      <p style="color: var(--muted); margin: 0;">Nenhuma etiqueta encontrada.</p>
-    {:else}
-      <div style="display: grid; gap: 12px;">
-        {#each filteredLabels as label}
-          <div
-            style="
-              border: 1px solid var(--border);
-              border-radius: 10px;
-              padding: 16px;
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              gap: 16px;
-              {label.isActive ? '' : 'opacity: 0.5; background: #f9fafb;'}
-            "
-          >
-            <div style="flex: 1;">
-              <div style="font-weight: 500; font-size: 15px;">
-                {label.name}
-              </div>
-              {#if !label.isActive}
-                <div style="font-size: 13px; color: #b91c1c; margin-top: 4px;">● Inativa</div>
-              {/if}
-            </div>
-
-            <div style="display: flex; gap: 8px; flex-shrink: 0;">
-              {#if label.isActive}
-                <button
-                  class="btn"
-                  on:click={() => startEdit(label)}
-                  disabled={isCreating || editingId}
-                  style="padding: 8px 12px; font-size: 13px;"
-                >
-                  Editar
-                </button>
-                <button
-                  class="btn"
-                  on:click={() => openDeleteModal(label, "deactivate")}
-                  style="padding: 8px 12px; font-size: 13px; background: #fef2f2; border-color: #fecaca; color: #b91c1c;"
-                >
-                  Desativar
-                </button>
-                <button
-                  class="btn btn-delete"
-                  on:click={() => openDeleteModal(label, "delete")}
-                  style="padding: 8px 12px; font-size: 13px;"
-                >
-                  Eliminar
-                </button>
-              {:else}
-                <button
-                  class="btn"
-                  on:click={() => toggleActive(label)}
-                  style="padding: 8px 12px; font-size: 13px; background: #ecfdf5; border-color: #bbf7d0; color: #166534;"
-                >
-                  Reativar
-                </button>
-                <button
-                  class="btn btn-delete"
-                  on:click={() => openDeleteModal(label, "delete")}
-                  style="padding: 8px 12px; font-size: 13px;"
-                >
-                  Eliminar
-                </button>
-              {/if}
-            </div>
-          </div>
-        {/each}
+        <div style="display: flex; gap: 8px;">
+          {#if label.isActive}
+            <button
+              on:click={() => startEdit(label)}
+              disabled={isCreating || editingId}
+              style="padding: 8px 12px; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;"
+            >
+              ✏️ Editar
+            </button>
+            <button
+              on:click={() => openDeleteModal(label, "deactivate")}
+              style="padding: 8px 12px; background: #fee2e2; color: #991b1b; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;"
+            >
+              × Desativar
+            </button>
+          {:else}
+            <button
+              on:click={() => toggleActive(label)}
+              style="padding: 8px 12px; background: #ecfdf5; color: #166534; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;"
+            >
+              ↺ Reativar
+            </button>
+          {/if}
+        </div>
       </div>
-    {/if}
-  </div>
+    {/each}
+  {/if}
 </div>
 
 <!-- Delete Confirmation Modal -->
@@ -366,36 +361,32 @@
     background: white;
     border-radius: 16px;
     padding: 24px;
-    max-width: 500px;
     width: 90%;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    animation: modalFadeIn 0.2s ease-out;
+    max-width: 500px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
   }
   
-  @keyframes modalFadeIn {
-    from {
-      opacity: 0;
-      transform: scale(0.95);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-
   .option-row {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    align-items: start;
-    gap: 10px;
-    padding: 10px 12px;
+    display: flex;
+    gap: 12px;
+    padding: 12px;
     border: 1px solid var(--border);
-    border-radius: 10px;
-    background: #f9fafb;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
   }
-
+  
+  .option-row:hover {
+    background: var(--muted-bg);
+    border-color: #d1d5db;
+  }
+  
+  .option-row input[type="radio"] {
+    margin-top: 2px;
+  }
+  
   .option-help {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--muted);
     margin-top: 2px;
   }

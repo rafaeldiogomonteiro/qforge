@@ -1,220 +1,136 @@
 <script>
-  import { api } from "$lib/api/client";
-  import { onMount } from "svelte";
+  import WelcomeBanner from "$lib/components/WelcomeBanner.svelte";
+  import StatCard from "$lib/components/StatCard.svelte";
+  import StatusIndicator from "$lib/components/StatusIndicator.svelte";
 
-  let loading = true;
-  let stats = {
-    totalQuestions: 0,
-    totalBanks: 0,
-    totalLabels: 0,
-    totalChapterTags: 0,
-    difficultyDistribution: { 1: 0, 2: 0, 3: 0, 4: 0 },
-    mostUsedQuestions: []
-  };
-
-  const DIFFICULTY_LABELS = {
-    1: "Básico",
-    2: "Normal",
-    3: "Difícil",
-    4: "Muito Difícil"
-  };
-
-  const DIFFICULTY_COLORS = {
-    1: "#ecfeff",
-    2: "#f0fdf4",
-    3: "#fffbeb",
-    4: "#fef2f2"
-  };
-
-  const TYPE_LABELS = {
-    MULTIPLE_CHOICE: "Escolha múltipla",
-    TRUE_FALSE: "V/F",
-    SHORT_ANSWER: "Resposta curta",
-    OPEN: "Aberta"
-  };
-
-  onMount(loadStats);
-
-  async function loadStats() {
-    loading = true;
-    
-    try {
-      const [banksRes, labelsRes, tagsRes] = await Promise.all([
-        api.get("/banks"),
-        api.get("/labels"),
-        api.get("/chapter-tags")
-      ]);
-
-      const banks = banksRes.data?.data || [];
-      const labels = labelsRes.data || [];
-      const tags = tagsRes.data || [];
-
-      stats.totalBanks = banks.length;
-      stats.totalLabels = labels.length;
-      stats.totalChapterTags = tags.length;
-
-      // Load all questions from all banks
-      let allQuestions = [];
-      for (const bank of banks) {
-        try {
-          const qRes = await api.get(`/banks/${bank._id}/questions`);
-          allQuestions = [...allQuestions, ...(qRes.data || [])];
-        } catch (e) {
-          console.error("Error loading questions for bank", bank._id);
-        }
-      }
-
-      stats.totalQuestions = allQuestions.length;
-
-      // Difficulty distribution
-      const diffDist = { 1: 0, 2: 0, 3: 0, 4: 0 };
-      allQuestions.forEach(q => {
-        if (q.difficulty >= 1 && q.difficulty <= 4) {
-          diffDist[q.difficulty]++;
-        }
-      });
-      stats.difficultyDistribution = diffDist;
-
-      // Most used questions (top 5)
-      stats.mostUsedQuestions = allQuestions
-        .filter(q => q.usageCount > 0)
-        .sort((a, b) => b.usageCount - a.usageCount)
-        .slice(0, 5);
-
-    } catch (e) {
-      console.error("Error loading stats:", e);
-    } finally {
-      loading = false;
-    }
-  }
+  const requestsPerMin = 142;
+  const maxRequests = 1000;
+  const requestsPercentage = (requestsPerMin / maxRequests) * 100;
 </script>
 
-<div style="max-width: 1400px;">
-  <h1 style="margin: 0 0 24px 0; font-size: 28px; font-weight: 600;">Painel</h1>
+<div style="display: flex; flex-direction: column; gap: 24px;">
+  <WelcomeBanner />
 
-  {#if loading}
-    <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 40px; text-align: center;">
-      <p style="color: var(--muted); margin: 0;">A carregar estatísticas...</p>
-    </div>
-  {:else}
-    <!-- Stats Cards -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
-      <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
-        <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Total de Questões</div>
-        <div style="font-size: 32px; font-weight: 600; color: #1d4ed8;">{stats.totalQuestions}</div>
+  <!-- Stats Grid: 4 columns -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px;">
+    <StatCard 
+      title="Bancos Ativos"
+      value="12"
+      icon="🗂️"
+      trend={{ value: "+2 este mês", positive: true }}
+      color="blue"
+    />
+    <StatCard 
+      title="Utilizadores"
+      value="48"
+      icon="👥"
+      trend={{ value: "+8% vs. mês anterior", positive: true }}
+      color="green"
+    />
+    <StatCard 
+      title="Testes Gerados"
+      value="326"
+      icon="✓"
+      trend={{ value: "+12% vs. ontem", positive: true }}
+      color="orange"
+    />
+    <StatCard 
+      title="Taxa de Sucesso"
+      value="98.2%"
+      icon="📊"
+      trend={{ value: "+0.5%", positive: true }}
+      color="green"
+    />
+  </div>
+
+  <!-- Info Cards: 2 columns on desktop -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; grid-auto-flow: dense;">
+    <!-- Rate Limiting Card -->
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+        <span style="font-size: 18px;">⚡</span>
+        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">Rate Limiting & Security</h3>
       </div>
-
-      <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
-        <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Bancos</div>
-        <div style="font-size: 32px; font-weight: 600; color: #059669;">{stats.totalBanks}</div>
-      </div>
-
-      <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
-        <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Etiquetas</div>
-        <div style="font-size: 32px; font-weight: 600; color: #7c3aed;">{stats.totalLabels}</div>
-      </div>
-
-      <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
-        <div style="font-size: 13px; color: var(--muted); margin-bottom: 8px;">Capítulos</div>
-        <div style="font-size: 32px; font-weight: 600; color: #ea580c;">{stats.totalChapterTags}</div>
-      </div>
-    </div>
-
-    <!-- Charts Row -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
-      <!-- Difficulty Distribution -->
-      <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
-        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">Distribuição por Dificuldade</h3>
-        
-        <div style="display: grid; gap: 12px;">
-          {#each Object.entries(stats.difficultyDistribution) as [level, count]}
-            {@const total = Object.values(stats.difficultyDistribution).reduce((a, b) => a + b, 0)}
-            {@const percentage = total > 0 ? Math.round((count / total) * 100) : 0}
-            
-            <div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                <span style="font-size: 14px; font-weight: 500;">{level} - {DIFFICULTY_LABELS[level]}</span>
-                <span style="font-size: 14px; color: var(--muted);">{count} ({percentage}%)</span>
-              </div>
-              <div style="width: 100%; height: 8px; background: #f3f4f6; border-radius: 4px; overflow: hidden;">
-                <div style="width: {percentage}%; height: 100%; background: {DIFFICULTY_COLORS[level]}; border: 1px solid #d1d5db; border-radius: 4px;"></div>
-              </div>
-            </div>
-          {/each}
-        </div>
-      </div>
-
-      <!-- Most Used Questions -->
-      <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
-        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">Questões mais usadas</h3>
-        
-        {#if stats.mostUsedQuestions.length === 0}
-          <p style="color: var(--muted); margin: 0; font-size: 14px;">Nenhuma questão foi usada ainda.</p>
-        {:else}
-          <div style="display: grid; gap: 12px;">
-            {#each stats.mostUsedQuestions as q}
-              <div style="border: 1px solid var(--border); border-radius: 10px; padding: 12px;">
-                <div style="display: flex; justify-content: space-between; align-items: start; gap: 12px; margin-bottom: 6px;">
-                  <div style="font-size: 14px; font-weight: 500; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                    {q.stem?.substring(0, 60)}{q.stem?.length > 60 ? '...' : ''}
-                  </div>
-                  <span style="display:inline-flex; padding:4px 8px; border-radius:999px; font-size:12px; background:#fef3c7; border:1px solid #fde047; font-weight: 600; white-space: nowrap;">
-                    {q.usageCount}x
-                  </span>
-                </div>
-                <div style="font-size: 12px; color: var(--muted);">
-                  {TYPE_LABELS[q.type] || q.type} • Dificuldade {q.difficulty}
-                </div>
-              </div>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
-      <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">Ações rápidas</h3>
       
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
-        <a href="/app/banks" class="action-btn">
-          <span style="font-size: 24px;">🗂️</span>
-          <div>
-            <div style="font-weight: 500;">Ver Bancos</div>
-            <div style="font-size: 12px; color: var(--muted);">Gerir bancos de questões</div>
-          </div>
-        </a>
+      <div style="background: #f8fafc; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+        <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px;">
+          <span style="font-size: 28px; font-weight: 600; color: #1e293b;">{requestsPerMin}</span>
+          <span style="font-size: 12px; color: #64748b;">requests/min</span>
+        </div>
+        <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-bottom: 8px;">
+          <div style="height: 100%; background: #10b981; width: {requestsPercentage}%;"></div>
+        </div>
+        <div style="font-size: 11px; color: #64748b;">Limite: {maxRequests} req/min</div>
+      </div>
 
-        <a href="/app/generate" class="action-btn">
-          <span style="font-size: 24px;">🤖</span>
-          <div>
-            <div style="font-weight: 500;">Gerar com IA</div>
-            <div style="font-size: 12px; color: var(--muted);">Criar questões automaticamente</div>
-          </div>
-        </a>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <StatusIndicator status="online" label="/auth" value="Operacional" />
+        <StatusIndicator status="online" label="/ai" value="Operacional" />
       </div>
     </div>
-  {/if}
+
+    <!-- Health Externos Card -->
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+        <span style="font-size: 18px;">🌐</span>
+        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">Health Externos</h3>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <StatusIndicator status="online" label="Groq API" value="Latência: 124ms" />
+        <StatusIndicator status="warning" label="OpenRouter API" value="Latência: 856ms" />
+      </div>
+    </div>
+
+    <!-- Chart Card: Full Width -->
+    <div style="grid-column: 1 / -1; background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+        <span style="font-size: 18px;">📈</span>
+        <h3 style="margin: 0; flex: 1; font-size: 16px; font-weight: 600; color: #1e293b;">Gerações de IA nas últimas 24h</h3>
+      </div>
+      
+      <svg style="width: 100%; height: 260px; margin-bottom: 16px;" viewBox="0 0 600 260">
+        <line x1="40" y1="220" x2="600" y2="220" stroke="#e2e8f0" stroke-dasharray="3 3" />
+        <line x1="40" y1="176" x2="600" y2="176" stroke="#e2e8f0" stroke-dasharray="3 3" />
+        <line x1="40" y1="132" x2="600" y2="132" stroke="#e2e8f0" stroke-dasharray="3 3" />
+        <line x1="40" y1="88" x2="600" y2="88" stroke="#e2e8f0" stroke-dasharray="3 3" />
+        <line x1="40" y1="44" x2="600" y2="44" stroke="#e2e8f0" stroke-dasharray="3 3" />
+
+        <text x="25" y="226" font-size="11" fill="#64748b">0</text>
+        <text x="20" y="182" font-size="11" fill="#64748b">9</text>
+        <text x="20" y="138" font-size="11" fill="#64748b">18</text>
+        <text x="20" y="94" font-size="11" fill="#64748b">27</text>
+        <text x="20" y="50" font-size="11" fill="#64748b">36</text>
+
+        <polyline
+          points="60,200 140,225 220,90 300,30 380,75 460,140"
+          fill="none"
+          stroke="#2563eb"
+          stroke-width="2"
+          stroke-linejoin="round"
+          stroke-linecap="round"
+        />
+
+        <circle cx="60" cy="200" r="4" fill="#2563eb" />
+        <circle cx="140" cy="225" r="4" fill="#2563eb" />
+        <circle cx="220" cy="90" r="4" fill="#2563eb" />
+        <circle cx="300" cy="30" r="4" fill="#2563eb" />
+        <circle cx="380" cy="75" r="4" fill="#2563eb" />
+        <circle cx="460" cy="140" r="4" fill="#2563eb" />
+
+        <text x="50" y="250" font-size="11" fill="#64748b">00:00</text>
+        <text x="130" y="250" font-size="11" fill="#64748b">04:00</text>
+        <text x="210" y="250" font-size="11" fill="#64748b">08:00</text>
+        <text x="290" y="250" font-size="11" fill="#64748b">12:00</text>
+        <text x="370" y="250" font-size="11" fill="#64748b">16:00</text>
+        <text x="450" y="250" font-size="11" fill="#64748b">20:00</text>
+      </svg>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="color: #64748b;">📊 Total de gerações: 125</span>
+        </div>
+        <span style="color: #10b981; font-weight: 500;">+12% vs. ontem</span>
+      </div>
+    </div>
+  </div>
 </div>
-
-<style>
-  .action-btn {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: white;
-    text-decoration: none;
-    color: inherit;
-    transition: all 0.15s;
-  }
-
-  .action-btn:hover {
-    background: #f9fafb;
-    border-color: #9ca3af;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  }
-</style>

@@ -19,7 +19,18 @@ export async function register(req, res) {
         .json({ error: "name, email e password são obrigatórios" });
     }
 
-    const existing = await User.findOne({ email });
+    if (email.length < 5) {
+      return res.status(400).json({ error: "Email inválido" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: "Password deve ter pelo menos 6 caracteres" });
+    }
+
+    // Normalizar email
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const existing = await User.findOne({ email: normalizedEmail });
     if (existing) {
       return res
         .status(409)
@@ -29,8 +40,8 @@ export async function register(req, res) {
     const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await User.create({
-      name,
-      email,
+      name: name.trim(),
+      email: normalizedEmail,
       passwordHash,
     });
 
@@ -47,7 +58,19 @@ export async function register(req, res) {
     });
   } catch (err) {
     console.error("Erro no register:", err);
-    res.status(500).json({ error: "Erro no servidor" });
+    console.error("Erro completo:", JSON.stringify(err, null, 2));
+
+    // Tratamento de erros específicos
+    if (err.code === 11000) {
+      return res.status(409).json({ error: "Já existe um utilizador com esse email" });
+    }
+
+    if (err.name === "ValidationError") {
+      const messages = Object.values(err.errors).map(e => e.message);
+      return res.status(400).json({ error: messages.join("; ") });
+    }
+
+    res.status(500).json({ error: "Erro ao registar - tenta novamente", details: err.message });
   }
 }
 

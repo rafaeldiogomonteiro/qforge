@@ -40,7 +40,14 @@ let moveTagsError = "";
 
 let deleteFolderMode = "move"; // move | delete
 
-  onMount(loadData);
+  onMount(async () => {
+    try {
+      await loadData();
+    } catch (err) {
+      console.error("Erro ao carregar dados de capítulos:", err);
+      error = "Falha ao carregar dados. Por favor, recarregue a página.";
+    }
+  });
 
   $: selectableFolders = groups
     .filter((g) => g.folder && g.folder.isActive)
@@ -384,119 +391,130 @@ async function deleteFolder() {
 </script>
 
 <div style="max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
-  <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px; display: grid; gap: 12px;">
-    <div style="display: flex; justify-content: space-between; gap: 16px; align-items: flex-start;">
-      <div>
-        <h2 style="margin: 0;">Gestão de capítulos</h2>
-        <p style="margin: 6px 0 0; color: var(--muted); font-size: 14px;">
-          Organiza capítulos por pastas para navegar mais rápido. Usa pesquisa global ou filtra inativos.
-        </p>
-        <div style="margin-top: 8px; color: var(--muted); font-size: 13px; display: flex; gap: 12px;">
-          <span>{totalFolders} pastas</span>
-          <span>{totalTags} capítulos</span>
+  <!-- Header -->
+  <div>
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; gap: 24px; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #1e293b;">Capítulos e Temas</h1>
+          <p style="margin: 8px 0 0; font-size: 14px; color: #64748b;">Organizar questões em estrutura hierárquica</p>
+        </div>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+          <button
+            style="padding: {showInactive ? '10px 16px' : '10px 16px'}; background: {showInactive ? '#2563eb' : 'white'}; color: {showInactive ? 'white' : '#1e293b'}; border: 1px solid {showInactive ? '#2563eb' : '#e2e8f0'}; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.15s;"
+            on:click={() => (showInactive = !showInactive, loadData())}
+          >
+            Mostrar Inativos
+          </button>
+          <button
+            style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.15s;"
+            on:click={startCreateFolder}
+          >
+            📁 Nova Pasta
+          </button>
+          <button
+            style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.15s;"
+            on:click={() => startCreateTag("")}
+          >
+            ➕ Nova Tag
+          </button>
         </div>
       </div>
-      <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: flex-end;">
-        <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; white-space: nowrap;">
-          <input type="checkbox" bind:checked={showInactive} on:change={loadData} />
-          Mostrar pastas/etiquetas inativas
-        </label>
-        <button class="btn" on:click={startCreateFolder}>+ Nova pasta</button>
-        <button class="btn primary" on:click={() => startCreateTag("")}>+ Nova etiqueta</button>
-      </div>
-    </div>
 
-    <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
-      <input
-        placeholder="Procurar etiqueta..."
-        value={searchTerm}
-        on:input={(e) => (searchTerm = e.target.value)}
-        style="flex: 1; min-width: 260px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;"
-      />
+      <!-- Search Bar -->
+      <div style="position: relative;">
+        <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 18px;">🔍</span>
+        <input
+          placeholder="Pesquisar capítulos e tags..."
+          value={searchTerm}
+          on:input={(e) => (searchTerm = e.target.value)}
+          style="width: 100%; padding: 10px 12px 10px 40px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; background: white;"
+        />
+      </div>
     </div>
   </div>
 
   {#if error}
-    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 14px; color: #b91c1c;">
+    <div style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 12px; padding: 14px; color: #991b1b;">
       {error}
     </div>
   {/if}
 
   {#if tagFormMode !== "none"}
-    <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 18px; display: grid; gap: 12px;">
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; display: grid; gap: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h3 style="margin: 0;">{tagFormMode === "edit" ? "Editar etiqueta" : "Nova etiqueta"}</h3>
-        <button class="btn" on:click={cancelTagForm} disabled={tagFormLoading}>Fechar</button>
+        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">{tagFormMode === "edit" ? "Editar etiqueta" : "Nova etiqueta"}</h3>
+        <button style="padding: 8px 12px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 14px;" on:click={cancelTagForm} disabled={tagFormLoading}>Fechar</button>
       </div>
 
       <div style="display: grid; gap: 12px;">
         <div>
-          <label style="font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px;">Nome</label>
+          <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">Nome</label>
           <input
             value={tagForm.name}
             on:input={(e) => (tagForm.name = e.target.value)}
             placeholder="ex: HTML"
             disabled={tagFormLoading}
-            style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 10px;"
+            style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px;"
           />
         </div>
 
         <div>
-          <label style="font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px;">Pasta</label>
+          <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">Pasta</label>
           <select
             bind:value={tagForm.folderId}
             disabled={tagFormLoading}
-            style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: white;"
+            style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: white; font-size: 14px;"
           >
             <option value="">Sem pasta</option>
             {#each selectableFolders as folder}
               <option value={folder._id}>{folder.name}</option>
             {/each}
           </select>
-          <div style="font-size: 12px; color: var(--muted); margin-top: 4px;">Apenas pastas ativas aparecem aqui.</div>
+          <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Apenas pastas ativas aparecem aqui.</div>
         </div>
 
         {#if tagFormError}
-          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px; color: #b91c1c;">{tagFormError}</div>
+          <div style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px; color: #991b1b;">{tagFormError}</div>
         {/if}
 
         <div style="display: flex; gap: 10px;">
-          <button class="btn primary" on:click|preventDefault={submitTagForm} disabled={tagFormLoading}>
+          <button style="padding: 10px 16px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;" on:click|preventDefault={submitTagForm} disabled={tagFormLoading}>
             {tagFormLoading ? "A guardar..." : "Guardar"}
           </button>
-          <button class="btn" type="button" on:click={cancelTagForm} disabled={tagFormLoading}>Cancelar</button>
+          <button style="padding: 10px 16px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 14px;" type="button" on:click={cancelTagForm} disabled={tagFormLoading}>Cancelar</button>
         </div>
       </div>
     </div>
   {/if}
 
   {#if folderFormMode !== "none"}
-    <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 18px; display: grid; gap: 12px;">
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; display: grid; gap: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h3 style="margin: 0;">{folderFormMode === "edit" ? "Editar pasta" : "Nova pasta"}</h3>
-        <button class="btn" on:click={cancelFolderForm} disabled={folderFormLoading}>Fechar</button>
+        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">{folderFormMode === "edit" ? "Editar pasta" : "Nova pasta"}</h3>
+        <button style="padding: 8px 12px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 14px;" on:click={cancelFolderForm} disabled={folderFormLoading}>Fechar</button>
       </div>
 
       <div style="display: grid; gap: 12px;">
         <div>
-          <label style="font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px;">Nome</label>
+          <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">Nome</label>
           <input
             value={folderForm.name}
             on:input={(e) => (folderForm.name = e.target.value)}
             placeholder="ex: Programação I"
             disabled={folderFormLoading}
-            style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 10px;"
+            style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px;"
           />
         </div>
 
         <div>
-          <label style="font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px;">Descrição (opcional)</label>
+          <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">Descrição (opcional)</label>
           <textarea
             value={folderForm.description}
             on:input={(e) => (folderForm.description = e.target.value)}
             rows="2"
             disabled={folderFormLoading}
-            style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 10px;"
+            style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px;"
           ></textarea>
         </div>
 
@@ -506,26 +524,60 @@ async function deleteFolder() {
         </label>
 
         {#if folderFormError}
-          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px; color: #b91c1c;">{folderFormError}</div>
+          <div style="background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px; color: #991b1b;">{folderFormError}</div>
         {/if}
 
         <div style="display: flex; gap: 10px;">
-          <button class="btn primary" on:click|preventDefault={submitFolderForm} disabled={folderFormLoading}>
+          <button style="padding: 10px 16px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;" on:click|preventDefault={submitFolderForm} disabled={folderFormLoading}>
             {folderFormLoading ? "A guardar..." : "Guardar"}
           </button>
-          <button class="btn" type="button" on:click={cancelFolderForm} disabled={folderFormLoading}>Cancelar</button>
+          <button style="padding: 10px 16px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 14px;" type="button" on:click={cancelFolderForm} disabled={folderFormLoading}>Cancelar</button>
         </div>
       </div>
     </div>
   {/if}
 
-  <div style="display: grid; gap: 12px;">
+  <!-- Content Area -->
+  <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
     {#if loading}
-      <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 16px; color: var(--muted);">A carregar...</div>
+      <div style="color: #64748b; text-align: center; padding: 20px;">A carregar...</div>
     {:else if filteredGroups.length === 0}
-      <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 16px; color: var(--muted);">Nenhuma etiqueta encontrada.</div>
+      <div style="color: #64748b; text-align: center; padding: 20px;">Nenhuma etiqueta encontrada.</div>
     {:else}
-      <div style="display: grid; gap: 12px;">
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <!-- Loose Tags Section -->
+        {#each filteredGroups.filter((g) => !g.folder) as group}
+          {#if group.tags.length > 0}
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div style="font-size: 13px; color: #64748b; padding-bottom: 8px;">Sem Pasta (Tags soltas)</div>
+              <div style="display: flex; flex-direction: column; gap: 0; margin-left: 0;">
+                {#each group.tags as tag}
+                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid #f3f4f6; transition: all 0.15s;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                      <input type="checkbox" style="width: 16px; height: 16px;" />
+                      <span style="font-size: 14px; color: #1e293b;">{tag.name}</span>
+                      <span style="font-size: 12px; color: #64748b;">({tag.questions?.length || 0} Q)</span>
+                    </div>
+                    <button
+                      style="padding: 4px 8px; background: transparent; border: none; cursor: pointer; color: #64748b; transition: all 0.15s;"
+                      on:click={() => startEditTag(tag)}
+                    >
+                      ✏️
+                    </button>
+                  </div>
+                {/each}
+              </div>
+              <button
+                style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #2563eb; background: transparent; border: none; cursor: pointer; padding: 0; margin-left: 8px; margin-top: 4px;"
+                on:click={() => startCreateTag("")}
+              >
+                ➕ Adicionar tag
+              </button>
+            </div>
+          {/if}
+        {/each}
+
+        <!-- Folders Section -->
         {#each sortableFolders as group (group.folder._id)}
           <FolderAccordion
             folder={group.folder}
@@ -539,26 +591,11 @@ async function deleteFolder() {
             onEditFolder={startEditFolder}
             onToggleFolder={toggleFolder}
             onDeleteFolder={confirmDeleteFolder}
-              onCreateTagInFolder={startCreateTag}
-              onMoveExistingToFolder={openMoveTagsModal}
+            onCreateTagInFolder={startCreateTag}
+            onMoveExistingToFolder={openMoveTagsModal}
           />
         {/each}
       </div>
-
-      {#each filteredGroups.filter((g) => !g.folder) as group}
-        <FolderAccordion
-          folder={group.folder}
-          tags={group.tags}
-          open={isFolderOpen(group.folder)}
-          on:toggle={() => toggleFolderOpen(group.folder)}
-          isEditingTag={tagFormMode !== "none"}
-          onEditTag={startEditTag}
-          onToggleTag={toggleTag}
-          onDeleteTag={confirmDeleteTag}
-          onCreateTagInFolder={startCreateTag}
-          onMoveExistingToFolder={openMoveTagsModal}
-        />
-      {/each}
     {/if}
   </div>
 </div>

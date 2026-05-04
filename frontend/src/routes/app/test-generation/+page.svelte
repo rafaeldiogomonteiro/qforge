@@ -243,143 +243,176 @@
   loadData();
 </script>
 
-<div style="display: flex; flex-direction: column; gap: 24px;">
-  <!-- Header -->
-  <div>
-    <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #1e293b;">Criar Teste</h1>
-    <p style="margin: 6px 0 0; font-size: 14px; color: #64748b;">Configure e gere testes personalizados a partir de bancos de questões</p>
-  </div>
+<div style="padding: 0;">
+  <h1 style="margin: 0 0 8px 0; font-size: 28px;">Geração de Testes Completos</h1>
+  <p style="color: var(--muted); margin-top: 0;">Cria testes personalizados com distribuição de dificuldade configurável</p>
+</div>
 
-  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-    <!-- LEFT: Configuration Form -->
-    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 18px;">
-      <h2 style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">⚙️ Configuração</h2>
+<div style="margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start;">
+  <!-- CONFIGURAÇÃO -->
+  <div style="background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
+    <h2 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 600;">Configuração do Teste</h2>
 
-      <div style="display: grid; gap: 16px;">
-        <div>
-          <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">
-            Banco de Questões
-          </label>
-          <select
-            bind:value={selectedBank}
-            style="width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; background: white; font-size: 14px;"
-          >
-            <option value="">Selecionar banco...</option>
-            {#each banks as bank}
-              <option value={bank._id}>{bank.title}</option>
-            {/each}
-          </select>
-        </div>
+    <div style="display: grid; gap: 16px;">
+      <div>
+        <label style="font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px;">
+          Banco de Questões
+        </label>
+        <select
+          bind:value={selectedBank}
+          style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: white; font-size: 14px;"
+        >
+          <option value="">Selecionar banco...</option>
+          {#each banks as bank}
+            <option value={bank._id}>{bank.title}</option>
+          {/each}
+        </select>
+      </div>
 
-        <div>
-          <label style="font-size: 13px; color: #64748b; display: block; margin-bottom: 6px;">
-            Número de Questões: <strong style="color: #1e293b;">{numQuestions}</strong>
-          </label>
-          <input
-            type="range"
-            min="5"
-            max="100"
-            step="1"
-            bind:value={numQuestions}
-            style="width: 100%; accent-color: #2563eb;"
-          />
-          <div style="font-size: 12px; color: #64748b; margin-top: 4px;">5 a 100 questões</div>
-        </div>
+      <div>
+        <label style="font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px;">
+          Número de Questões: <strong>{numQuestions}</strong>
+        </label>
+        <input
+          type="range"
+          min="5"
+          max="100"
+          step="1"
+          bind:value={numQuestions}
+          style="width: 100%;"
+        />
+        <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Mín: 5 • Máx: 100</div>
+      </div>
 
-        <div style="border-top: 1px solid #e2e8f0; padding-top: 16px;">
-          <h3 style="margin: 0 0 12px 0; font-size: 13px; font-weight: 600; color: #1e293b;">Distribuição</h3>
+      <div style="border-top: 1px solid var(--border); padding-top: 16px;">
+        <h3 style="margin: 0 0 12px 0; font-size: 13px; font-weight: 600;">Distribuição por Dificuldade</h3>
 
-          <div style="display: grid; gap: 12px;">
-            <div>
-              <label style="font-size: 12px; color: #64748b; display: flex; justify-content: space-between; margin-bottom: 6px;">
-                <span>Fácil</span>
-                <strong style="color: #10b981;">{easyPercentage}%</strong>
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                bind:value={easyPercentage}
-                style="width: 100%; accent-color: #10b981;"
-              />
-              <div style="font-size: 11px; color: #64748b; margin-top: 4px;">{getEasyCount()} questões</div>
+        <div style="display: grid; gap: 12px;">
+          <div>
+            <label style="font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span>Fácil</span>
+              <strong style="color: #10b981;">{easyPercentage}%</strong>
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              bind:value={easyPercentage}
+              style="width: 100%;"
+            />
+            <div style="font-size: 11px; color: #999; margin-top: 4px;">{getEasyCount()} questões</div>
+          </div>
+
+          <div>
+            <label style="font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span>Médio</span>
+              <strong style="color: #f59e0b;">{mediumPercentage}%</strong>
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              bind:value={mediumPercentage}
+              style="width: 100%;"
+            />
+            <div style="font-size: 11px; color: #999; margin-top: 4px;">{getMediumCount()} questões</div>
+          </div>
+
+          <div>
+            <label style="font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span>Difícil</span>
+              <strong style="color: #ef4444;">{hardPercentage}%</strong>
+            </label>
+            <div style="width: 100%; height: 6px; background: #e5e7eb; border-radius: 3px; position: relative; overflow: hidden;">
+              <div style="width: {hardPercentage}%; height: 100%; background: #ef4444;"></div>
             </div>
-
-            <div>
-              <label style="font-size: 12px; color: #64748b; display: flex; justify-content: space-between; margin-bottom: 6px;">
-                <span>Médio</span>
-                <strong style="color: #f59e0b;">{mediumPercentage}%</strong>
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                bind:value={mediumPercentage}
-                style="width: 100%; accent-color: #f59e0b;"
-              />
-              <div style="font-size: 11px; color: #64748b; margin-top: 4px;">{getMediumCount()} questões</div>
-            </div>
-
-            <div>
-              <label style="font-size: 12px; color: #64748b; display: flex; justify-content: space-between; margin-bottom: 6px;">
-                <span>Difícil</span>
-                <strong style="color: #ef4444;">{hardPercentage}%</strong>
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                bind:value={hardPercentage}
-                style="width: 100%; accent-color: #ef4444;"
-              />
-              <div style="font-size: 11px; color: #64748b; margin-top: 4px;">{getHardCount()} questões</div>
-            </div>
+            <div style="font-size: 11px; color: #999; margin-top: 4px;">{getHardCount()} questões</div>
           </div>
         </div>
+      </div>
 
-        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;">
-          <input type="checkbox" bind:checked={shuffleQuestions} style="width: 16px; height: 16px;" />
-          <span style="color: #1e293b;">Baralhar ordem das questões</span>
+      <div>
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <input type="checkbox" bind:checked={shuffleQuestions} />
+          <span style="font-size: 13px;">Baralhar ordem das questões</span>
         </label>
+      </div>
 
+      <div style="border-top: 1px solid var(--border); padding-top: 16px;">
+        <h3 style="margin: 0 0 12px 0; font-size: 13px; font-weight: 600;">Tags Incluídas</h3>
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+          <input
+            type="text"
+            bind:value={includeInput}
+            placeholder="Ex: algebra, geometria"
+            style="flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px;"
+          />
+          <button
+            on:click={() => addIncludedLabel(includeInput)}
+            style="padding: 8px 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;"
+          >
+            +
+          </button>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+          {#each selectedLabels as label}
+            <span style="background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+              {label}
+              <button
+                on:click={() => removeIncluded(label)}
+                style="background: none; border: none; color: #1e40af; cursor: pointer; font-weight: bold;"
+              >
+                ✕
+              </button>
+            </span>
+          {/each}
+        </div>
+      </div>
+
+      <div>
+        <h3 style="margin: 0 0 12px 0; font-size: 13px; font-weight: 600;">Tags Excluídas</h3>
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+          <input
+            type="text"
+            bind:value={excludeInput}
+            placeholder="Ex: trigonometria"
+            style="flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px;"
+          />
+          <button
+            on:click={() => addExcludedLabel(excludeInput)}
+            style="padding: 8px 12px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;"
+          >
+            +
+          </button>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+          {#each excludedLabels as label}
+            <span style="background: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+              {label}
+              <button
+                on:click={() => removeExcluded(label)}
+                style="background: none; border: none; color: #991b1b; cursor: pointer; font-weight: bold;"
+              >
+                ✕
+              </button>
+            </span>
+          {/each}
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
         <button
-          style="padding: 12px 16px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.15s;"
           on:click={generateTest}
-          disabled={!selectedBank}
+          disabled={generating || !selectedBank}
+          style="padding: 12px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: {generating || !selectedBank ? 'not-allowed' : 'pointer'}; font-size: 14px; opacity: {generating || !selectedBank ? 0.6 : 1};"
         >
-          ✨ Gerar Teste
+          {#if generating}
+            ⏳ Gerando...
+          {:else}
+            👁️ Pré-visualizar
+          {/if}
         </button>
       </div>
-    </div>
-
-    <!-- RIGHT: Preview/Download -->
-    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; flex-direction: column;">
-      <h2 style="margin: 0 0 18px 0; font-size: 16px; font-weight: 600; color: #1e293b;">📄 Pré-visualização</h2>
-
-      {#if generatedHTML.length === 0}
-        <p style="margin: 0; color: #64748b; font-size: 14px;">Configura e clica em "Gerar Teste" para ver a pré-visualização aqui...</p>
-      {:else}
-        <div style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; overflow-y: auto; max-height: 500px; margin-bottom: 16px; font-size: 12px; line-height: 1.5; color: #1e293b;">
-          <div style="white-space: pre-wrap; word-break: break-word; font-family: monospace;">
-            {generatedHTML.substring(0, 500)}...
-          </div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-          <button
-            style="padding: 12px 16px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.15s;"
-            on:click={downloadHTML}
-          >
-            📥 Baixar HTML
-          </button>
-          <button
-            style="padding: 12px 16px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.15s;"
-            on:click={printTest}
-          >
-            🖨️ Imprimir
-          </button>
-        </div>
-      {/if}
     </div>
   </div>
 

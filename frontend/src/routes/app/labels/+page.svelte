@@ -174,10 +174,11 @@
       <form on:submit|preventDefault={submitForm}>
         <div style="display: grid; gap: 12px;">
           <div>
-            <label style="font-size: 14px; color: #1e293b; display: block; margin-bottom: 6px; font-weight: 500;">
+            <label for="label-name" style="font-size: 14px; color: #1e293b; display: block; margin-bottom: 6px; font-weight: 500;">
               Nome *
             </label>
             <input
+              id="label-name"
               bind:value={formName}
               type="text"
               placeholder="ex: Época Normal"
@@ -270,12 +271,13 @@
       </div>
     {/each}
   {/if}
+  </div>
 </div>
 
 <!-- Delete Confirmation Modal -->
 {#if showDeleteModal && labelToDelete}
-  <div class="modal-overlay" on:click={closeDeleteModal}>
-    <div class="modal-content" on:click|stopPropagation>
+  <div class="modal-overlay" on:click={closeDeleteModal} on:keydown={(e) => e.key === 'Escape' && closeDeleteModal()} role="presentation">
+    <div class="modal-content" on:click|stopPropagation on:keydown|preventDefault>
       <h3 style="margin: 0 0 14px 0; font-size: 18px;">Gestão da etiqueta</h3>
       <p style="margin: 0 0 14px 0; color: var(--muted); line-height: 1.5;">
         O que pretendes fazer com <strong style="color: var(--text);">"{labelToDelete.name}"</strong>?

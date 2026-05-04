@@ -2,6 +2,7 @@ import axios from "axios";
 import { get } from "svelte/store";
 import { authToken } from "$lib/stores/auth";
 import { currentUser } from "$lib/stores/user";
+import { browser } from "$app/environment";
 
 const baseURL =
   import.meta.env.VITE_API_URL || "https://qforge-backend.maruqes.com";
@@ -42,3 +43,16 @@ api.interceptors.request.use((config) => {
 
   return withUserScope(config);
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      authToken.set(null);
+      if (browser) {
+        window.location.href = "/login";
+      }
+    }
+    return Promise.reject(error);
+  }
+);

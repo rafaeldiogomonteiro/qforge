@@ -7,6 +7,9 @@
     { href: "/app", label: "Painel", icon: "📊" },
     { href: "/app/banks", label: "Bancos de Questões", icon: "🗂️" },
     { href: "/app/generate", label: "Gerar com IA", icon: "🤖" },
+    { href: "/app/test-generation", label: "Geração de Testes", icon: "📝" },
+    { href: "/app/moodle", label: "Integração Moodle", icon: "🔗" },
+    { href: "/app/audit-history", label: "Auditoria", icon: "📋" },
     { href: "/app/labels", label: "Etiquetas", icon: "🏷️" },
     { href: "/app/chapter-tags", label: "Capítulos", icon: "📚" }
   ];
@@ -62,17 +65,17 @@
     left: 0;
     top: 0;
     bottom: 0;
-    width: 260px;
-    background: white;
-    border-right: 1px solid #e5e7eb;
+    width: 210px;
+    background: #0f172a;
+    border-right: 1px solid #1e293b;
     display: flex;
     flex-direction: column;
     z-index: 100;
   }
 
   .sidebar-header {
-    padding: 20px;
-    border-bottom: 1px solid #e5e7eb;
+    padding: 24px 20px;
+    border-bottom: 1px solid #1e293b;
   }
 
   .sidebar-brand {
@@ -87,15 +90,22 @@
 
   .brand-icon {
     font-size: 24px;
+    background: #2563eb;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .brand-text {
-    color: #111827;
+    color: #f8fafc;
   }
 
   .sidebar-nav {
     flex: 1;
-    padding: 16px 12px;
+    padding: 12px 8px;
     overflow-y: auto;
   }
 
@@ -103,10 +113,10 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 16px;
-    border-radius: 10px;
+    padding: 10px 16px;
+    border-radius: 8px;
     text-decoration: none;
-    color: #6b7280;
+    color: #cbd5e1;
     font-size: 14px;
     font-weight: 500;
     margin-bottom: 4px;
@@ -114,19 +124,18 @@
   }
 
   .nav-item:hover {
-    background: #f3f4f6;
-    color: #111827;
+    background: #1e293b;
+    color: #f8fafc;
   }
 
   .nav-item.active {
-    background: #eff6ff;
-    color: #1d4ed8;
-    border: 1px solid #bfdbfe;
+    background: #2563eb;
+    color: #ffffff;
   }
 
   .nav-icon {
     font-size: 18px;
-    width: 24px;
+    width: 20px;
     text-align: center;
   }
 
@@ -136,7 +145,7 @@
 
   .sidebar-footer {
     padding: 16px;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid #1e293b;
     display: grid;
     gap: 12px;
   }
@@ -146,26 +155,27 @@
     align-items: center;
     gap: 12px;
     padding: 10px 12px;
-    border-radius: 10px;
+    border-radius: 8px;
     text-decoration: none;
-    color: inherit;
+    color: #cbd5e1;
     transition: all 0.15s;
     border: 1px solid transparent;
   }
 
   .profile-link:hover {
-    background: #f3f4f6;
+    background: #1e293b;
+    color: #f8fafc;
   }
 
   .profile-link.active {
-    background: #eff6ff;
-    border-color: #bfdbfe;
+    background: #2563eb;
+    color: #ffffff;
   }
 
   .user-avatar {
     width: 40px;
     height: 40px;
-    background: #f3f4f6;
+    background: #1e293b;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -181,7 +191,7 @@
   .user-name {
     font-size: 14px;
     font-weight: 500;
-    color: #111827;
+    color: #f8fafc;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -189,24 +199,26 @@
 
   .user-hint {
     font-size: 12px;
-    color: #6b7280;
+    color: #64748b;
   }
 
   .logout-btn {
     width: 100%;
     padding: 10px 12px;
-    border-radius: 10px;
-    border: 1px solid #e5e7eb;
-    background: #fff7ed;
-    color: #c2410c;
+    border-radius: 8px;
+    border: 1px solid #1e293b;
+    background: transparent;
+    color: #cbd5e1;
     font-weight: 600;
     cursor: pointer;
+    font-size: 13px;
     transition: all 0.15s;
   }
   
   .logout-btn:hover {
-    background: #ffedd5;
-    border-color: #fdba74;
+    background: #1e293b;
+    border-color: #475569;
+    color: #f8fafc;
   }
 
 

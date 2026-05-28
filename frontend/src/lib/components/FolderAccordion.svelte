@@ -103,6 +103,6 @@
         ➕ Adicionar tag
       </button>
     </div>
-  {/if}
+  {/if}s
 </div>
 

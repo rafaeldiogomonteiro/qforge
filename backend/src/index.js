@@ -19,6 +19,8 @@ import chapterTagRoutes from "./routes/chapterTagRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import auditRoutes from "./routes/auditRoutes.js";
 import folderRoutes from "./routes/folderRoutes.js";
+import moodleRoutes from "./routes/moodleRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
 import User from "./models/User.js";
 import Label from "./models/Label.js";
 import ChapterTagFolder from "./models/ChapterTagFolder.js";
@@ -82,7 +84,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
-app.use(express.json());
+// Moodle XML pode ser maior; aumenta o limite para uploads de export/import.
+app.use(express.json({ limit: "10mb" }));
 
 // Swagger UI em /docs
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -90,17 +93,19 @@ app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // Rotas principais
 app.use("/auth", authRoutes);
 app.use("/banks", bankRoutes);
+// Rota de health check (não deve exigir autenticação)
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", message: "QForge API está a funcionar" });
+});
+
 app.use("/", questionRoutes);
 app.use("/labels", labelRoutes);
 app.use("/chapter-tags", chapterTagRoutes);
 app.use("/folders", folderRoutes);
 app.use("/ai", aiRoutes);
 app.use("/audit-logs", auditRoutes);
-
-// Rota de health check
-app.get("/health", (req, res) => {
-  res.json({ status: "ok", message: "QForge API está a funcionar" });
-});
+app.use("/moodle", moodleRoutes);
+app.use("/dashboard", dashboardRoutes);
 
 const PORT = 4000;
 

@@ -2,6 +2,7 @@ import QuestionBank from "../models/QuestionBank.js";
 import Question from "../models/Question.js";
 import Label from "../models/Label.js";
 import ChapterTag from "../models/ChapterTag.js";
+import AuditLog from "../models/AuditLog.js";
 import { XMLParser } from "fast-xml-parser";
 
 // POST /banks
@@ -23,6 +24,21 @@ export async function createBank(req, res) {
       owner: req.userId,
       tags: tags || [],
     });
+
+    // Auditoria: criação de banco
+    try {
+      await AuditLog.create({
+        userId: req.userId,
+        action: "Criação",
+        targetType: "Banco",
+        targetId: bank._id,
+        targetName: bank.title,
+        result: "Sucesso",
+        ipAddress: req.ip,
+      });
+    } catch (e) {
+      console.warn("Falha ao criar AuditLog (Criação Banco):", e?.message || e);
+    }
 
     res.status(201).json(bank);
   } catch (err) {
@@ -147,6 +163,21 @@ export async function updateBank(req, res) {
 
     await bank.save();
 
+    // Auditoria: edição de banco
+    try {
+      await AuditLog.create({
+        userId: req.userId,
+        action: "Edição",
+        targetType: "Banco",
+        targetId: bank._id,
+        targetName: bank.title,
+        result: "Sucesso",
+        ipAddress: req.ip,
+      });
+    } catch (e) {
+      console.warn("Falha ao criar AuditLog (Edição Banco):", e?.message || e);
+    }
+
     res.json(bank);
   } catch (err) {
     console.error("Erro em updateBank:", err);
@@ -173,6 +204,21 @@ export async function deleteBank(req, res) {
     // Remove questões ligadas e depois o banco
     await Question.deleteMany({ bank: bank._id });
     await bank.deleteOne();
+
+    // Auditoria: eliminação de banco
+    try {
+      await AuditLog.create({
+        userId: req.userId,
+        action: "Eliminação",
+        targetType: "Banco",
+        targetId: bank._id,
+        targetName: bank.title,
+        result: "Sucesso",
+        ipAddress: req.ip,
+      });
+    } catch (e) {
+      console.warn("Falha ao criar AuditLog (Eliminação Banco):", e?.message || e);
+    }
 
     res.json({ message: "Banco apagado com sucesso" });
   } catch (err) {
@@ -1048,6 +1094,22 @@ export async function importBank(req, res) {
     });
 
     const created = await Question.insertMany(docsWithIds, { ordered: false });
+
+    // Auditoria: importação de banco
+    try {
+      await AuditLog.create({
+        userId: req.userId,
+        action: "Importação",
+        targetType: "Banco",
+        targetId: bank._id,
+        targetName: bank.title,
+        result: "Sucesso",
+        ipAddress: req.ip,
+        details: { importedQuestions: created.length, format: fmt },
+      });
+    } catch (e) {
+      console.warn("Falha ao criar AuditLog (Importação Banco):", e?.message || e);
+    }
 
     res.json({
       bankId: bank._id,

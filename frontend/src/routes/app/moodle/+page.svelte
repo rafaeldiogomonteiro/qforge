@@ -18,6 +18,7 @@
   let moodleQuestionCategories = [];
   let moodleQuestionCategoriesLoading = false;
   let moodleQuestionCategoryId = "";
+  let moodleQuestionCategoriesError = "";
 
   let autoImporting = false;
   let autoImportSuccess = false;
@@ -94,6 +95,7 @@
 
     try {
       moodleQuestionCategoriesLoading = true;
+      moodleQuestionCategoriesError = "";
       autoImportError = "";
 
       const res = await api.get(
@@ -110,6 +112,8 @@
     } catch (e) {
       console.error("Erro ao carregar categorias Moodle:", e);
       moodleQuestionCategories = [];
+      moodleQuestionCategoriesError =
+        e?.response?.data?.error || e.message || "Erro ao carregar categorias Moodle";
     } finally {
       moodleQuestionCategoriesLoading = false;
     }
@@ -677,6 +681,12 @@
       </select>
     </div>
   </div>
+
+  {#if moodleQuestionCategoriesError}
+    <div style="margin-top: 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px; color: #b91c1c; font-size: 13px;">
+      {moodleQuestionCategoriesError}
+    </div>
+  {/if}
 
   {#if autoImportError}
     <div style="margin-top: 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px; color: #b91c1c; font-size: 13px;">

@@ -280,12 +280,13 @@ export async function listMoodleCoursesHandler(req, res) {
           const nested = c?.course && typeof c.course === "object" ? c.course : {};
 
           const idCandidates = [
-            c?.id,
             c?.courseid,
             c?.course_id,
             nested?.id,
             nested?.courseid,
             nested?.course_id,
+            c?.id,
+            nested?.id,
           ];
 
           const id = Number(
@@ -422,11 +423,11 @@ export async function listMoodleQuestionCategoriesHandler(req, res) {
     const categories = categoriesRaw
       .map((c) => {
         const idCandidates = [
-          c?.id,
-          c?.categoryid,
-          c?.category_id,
           c?.questioncategoryid,
           c?.question_category_id,
+          c?.categoryid,
+          c?.category_id,
+          c?.id,
         ];
         const id = Number(idCandidates.find((v) => v !== undefined && v !== null) ?? 0);
 

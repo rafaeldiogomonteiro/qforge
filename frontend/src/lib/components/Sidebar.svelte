@@ -7,7 +7,7 @@
     { href: "/app", label: "Painel", icon: "📊" },
     { href: "/app/banks", label: "Bancos de Questões", icon: "🗂️" },
     { href: "/app/generate", label: "Gerar com IA", icon: "🤖" },
-    { href: "/app/test-generation", label: "Geração de Testes", icon: "📝" },
+    { href: "/app/ai-chat", label: "PDF -> Questões", icon: "📄" },
     { href: "/app/moodle", label: "Integração Moodle", icon: "🔗" },
     { href: "/app/audit-history", label: "Auditoria", icon: "📋" },
     { href: "/app/labels", label: "Etiquetas", icon: "🏷️" },

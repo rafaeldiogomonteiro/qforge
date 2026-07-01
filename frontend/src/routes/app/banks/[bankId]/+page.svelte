@@ -756,7 +756,8 @@
 
             <!-- Labels -->
             {#if (q.labels || []).some(l => typeof l !== 'string' && l?.name)}
-              <div style="margin-top: 10px; display:flex; gap:6px; flex-wrap: wrap;">
+              <div style="margin-top: 10px; display:flex; gap:6px; flex-wrap: wrap; align-items: center;">
+                <span style="font-size:12px; color: var(--muted); font-weight: 600;">Etiquetas:</span>
                 {#each q.labels as label}
                   {#if typeof label !== 'string' && label?.name}
                   <span style="display:inline-flex; padding:3px 8px; border-radius:999px; font-size:12px; border:1px solid #a5f3fc; background:#ecfeff; color:#155e75;">
@@ -769,7 +770,8 @@
 
             <!-- Chapter Tags -->
             {#if (q.chapterTags || []).some(t => typeof t !== 'string' && t?.name)}
-              <div style="margin-top: 10px; display:flex; gap:6px; flex-wrap: wrap;">
+              <div style="margin-top: 10px; display:flex; gap:6px; flex-wrap: wrap; align-items: center;">
+                <span style="font-size:12px; color: var(--muted); font-weight: 600;">Chapters:</span>
                 {#each q.chapterTags as tag}
                   {#if typeof tag !== 'string' && tag?.name}
                   <span style="display:inline-flex; padding:3px 8px; border-radius:999px; font-size:12px; border:1px solid #c4b5fd; background:#f5f3ff; color:#6b21a8;">

@@ -43,6 +43,7 @@ export async function getDashboardStats(req, res) {
       successRate: `${successRate}%`,
       aiQuestionsCount,
       questionsCount,
+      auditCount: totalAudit,
     });
   } catch (err) {
     console.error("Erro em getDashboardStats:", err);

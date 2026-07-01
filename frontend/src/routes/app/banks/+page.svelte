@@ -192,21 +192,21 @@
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; text-align: center;">
           <div>
             <div style="font-size: 18px; font-weight: 600; color: #1e293b;">
-              {bank._questions?.length || 0}
+              {bank.questionCount || 0}
             </div>
             <div style="font-size: 11px; color: #64748b;">Questões</div>
           </div>
           <div style="border-left: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0;">
             <div style="font-size: 18px; font-weight: 600; color: #1e293b;">
-              {bank._tags?.length || 0}
+              {bank.labelCount || 0}
             </div>
-            <div style="font-size: 11px; color: #64748b;">Tags</div>
+            <div style="font-size: 11px; color: #64748b;">Etiquetas</div>
           </div>
           <div>
             <div style="font-size: 18px; font-weight: 600; color: #1e293b;">
-              {bank._folders?.length || 0}
+              {bank.chapterCount || 0}
             </div>
-            <div style="font-size: 11px; color: #64748b;">Pastas</div>
+            <div style="font-size: 11px; color: #64748b;">Chapters</div>
           </div>
         </div>
 

@@ -129,7 +129,12 @@ export async function generateQuestionsHandler(req, res) {
             ? q.chapterTags
             : [];
         // Labels são sempre as fornecidas pelo utilizador; se não houver, mantém vazio.
-        const finalLabels = userProvidedLabels;
+        const finalLabels =
+          userProvidedLabels.length > 0
+            ? userProvidedLabels
+            : Array.isArray(q.labels) && q.labels.length > 0
+            ? q.labels
+            : [];
 
         console.log(`[AI] Processando chapter tags para questão:`, finalChapterTags);
         console.log(`[AI] Processando labels para questão:`, finalLabels);

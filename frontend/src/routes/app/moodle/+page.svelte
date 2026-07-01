@@ -19,6 +19,9 @@
   let moodleQuestionCategoriesLoading = false;
   let moodleQuestionCategoryId = "";
   let moodleQuestionCategoriesError = "";
+  let moodleQuestionCategoriesInfo = "";
+  let moodleQuestionCategoriesDebug = null;
+  let moodleQuestionCategoriesRequestId = 0;
 
   let autoImporting = false;
   let autoImportSuccess = false;
@@ -88,20 +91,38 @@
   }
 
   async function loadMoodleQuestionCategories() {
+    const requestId = ++moodleQuestionCategoriesRequestId;
+    moodleQuestionCategories = [];
+    moodleQuestionCategoryId = "";
+    moodleQuestionCategoriesError = "";
+    moodleQuestionCategoriesInfo = "";
+    moodleQuestionCategoriesDebug = null;
+    moodleQuestionCategoriesLoading = false;
+
     if (!moodleConnectionExists) return;
 
     const courseIdNum = Number(moodleCourseId);
-    if (!Number.isFinite(courseIdNum) || courseIdNum <= 0) return;
+    if (!Number.isFinite(courseIdNum) || courseIdNum <= 0) {
+      moodleQuestionCategoriesError = moodleCourseId
+        ? `Curso Moodle invalido: ${moodleCourseId}`
+        : "";
+      return;
+    }
 
     try {
       moodleQuestionCategoriesLoading = true;
       moodleQuestionCategoriesError = "";
       autoImportError = "";
 
-      const res = await api.get(
-        `/moodle/question-categories?courseId=${courseIdNum}`
-      );
-      moodleQuestionCategories = res.data?.categories || [];
+      const res = await api.get("/moodle/question-categories", {
+        params: { courseId: courseIdNum, debug: true },
+      });
+      if (requestId !== moodleQuestionCategoriesRequestId) return;
+
+      moodleQuestionCategories = Array.isArray(res.data?.categories)
+        ? res.data.categories
+        : [];
+      moodleQuestionCategoriesDebug = res.data?.debug || null;
 
       if (
         !moodleQuestionCategoryId &&
@@ -109,14 +130,44 @@
       ) {
         moodleQuestionCategoryId = String(moodleQuestionCategories[0].id);
       }
+
+      if (moodleQuestionCategories.length === 0) {
+        const debug = moodleQuestionCategoriesDebug;
+        const details = [
+          debug?.possibleCause,
+          debug?.moodleMessage ? `Moodle: ${debug.moodleMessage}` : "",
+          debug?.rawCategoryCount !== undefined
+            ? `raw=${debug.rawCategoryCount}, mapped=${debug.mappedCategoryCount}`
+            : "",
+          debug?.categoriesSourcePath ? `fonte=${debug.categoriesSourcePath}` : "",
+        ].filter(Boolean);
+
+        moodleQuestionCategoriesInfo =
+          `0 categorias retornadas pelo Moodle para o curso ${courseIdNum}.` +
+          (details.length ? ` ${details.join(" ")}` : "");
+
+        console.warn("Debug /moodle/question-categories:", {
+          courseId: courseIdNum,
+          debug,
+        });
+      }
     } catch (e) {
+      if (requestId !== moodleQuestionCategoriesRequestId) return;
+
       console.error("Erro ao carregar categorias Moodle:", e);
       moodleQuestionCategories = [];
       moodleQuestionCategoriesError =
         e?.response?.data?.error || e.message || "Erro ao carregar categorias Moodle";
+      moodleQuestionCategoriesDebug = e?.response?.data?.debug || null;
     } finally {
-      moodleQuestionCategoriesLoading = false;
+      if (requestId === moodleQuestionCategoriesRequestId) {
+        moodleQuestionCategoriesLoading = false;
+      }
     }
+  }
+
+  async function handleMoodleCourseChange() {
+    await loadMoodleQuestionCategories();
   }
 
   async function saveMoodleConnection() {
@@ -250,6 +301,14 @@
       return;
     }
 
+    const courseName =
+      moodleCourses.find((course) => String(course.id) === moodleCourseIdStr)
+        ?.fullname || moodleCourseIdStr;
+    const confirmed = window.confirm(
+      `Enviar o banco selecionado para o Moodle?\n\nCurso: ${courseName}\nCategoria de destino: ${moodleCategoryNameStr}`
+    );
+    if (!confirmed) return;
+
     exportError = "";
     exporting = true;
     exportSuccess = false;
@@ -339,6 +398,18 @@
       autoImportError = "Seleciona uma categoria de Question Bank";
       return;
     }
+
+    const courseName =
+      moodleCourses.find((course) => String(course.id) === String(courseIdNum))
+        ?.fullname || String(courseIdNum);
+    const categoryName =
+      moodleQuestionCategories.find(
+        (category) => String(category.id) === String(categoryIdNum)
+      )?.name || String(categoryIdNum);
+    const confirmed = window.confirm(
+      `Importar perguntas do Moodle para a app?\n\nCurso: ${courseName}\nCategoria: ${categoryName}`
+    );
+    if (!confirmed) return;
 
     autoImporting = true;
     try {
@@ -521,12 +592,13 @@
           </label>
           <select
             bind:value={moodleCourseId}
+            on:change={handleMoodleCourseChange}
             disabled={moodleCoursesLoading || moodleCourses.length === 0}
             style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: white; font-size: 14px;"
           >
             <option value="">{moodleCoursesLoading ? "A carregar..." : moodleCourses.length ? "Selecionar curso..." : "Sem cursos"}</option>
             {#each moodleCourses as c}
-              <option value={c.id}>{c.fullname}</option>
+              <option value={String(c.id)}>{c.fullname}</option>
             {/each}
           </select>
         </div>
@@ -652,10 +724,11 @@
       </label>
       <select
         bind:value={moodleCourseId}
-        on:change={() => loadMoodleQuestionCategories()}
+        on:change={handleMoodleCourseChange}
         style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: white; font-size: 14px;"
         disabled={!moodleConnectionExists || moodleCoursesLoading}
       >
+        <option value="">{moodleCoursesLoading ? "A carregar..." : "Selecionar curso..."}</option>
         {#each moodleCourses as c}
           <option value={String(c.id)}>{c.fullname || c.shortname}</option>
         {/each}
@@ -675,6 +748,13 @@
           moodleQuestionCategories.length === 0
         }
       >
+        <option value="">
+          {moodleQuestionCategoriesLoading
+            ? "A carregar..."
+            : moodleQuestionCategories.length
+              ? "Selecionar categoria..."
+              : "Sem categorias"}
+        </option>
         {#each moodleQuestionCategories as cat}
           <option value={String(cat.id)}>{cat.name}</option>
         {/each}
@@ -682,9 +762,25 @@
     </div>
   </div>
 
+  {#if moodleQuestionCategoriesInfo && !moodleQuestionCategoriesError}
+    <div style="margin-top: 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px; color: #92400e; font-size: 13px;">
+      {moodleQuestionCategoriesInfo}
+      {#if moodleQuestionCategoriesDebug?.categoriesSourcePath}
+        <div style="margin-top: 6px; color: #78350f;">
+          Fonte: {moodleQuestionCategoriesDebug.categoriesSourcePath}
+        </div>
+      {/if}
+    </div>
+  {/if}
+
   {#if moodleQuestionCategoriesError}
     <div style="margin-top: 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px; color: #b91c1c; font-size: 13px;">
       {moodleQuestionCategoriesError}
+      {#if moodleQuestionCategoriesDebug?.possibleCause}
+        <div style="margin-top: 6px;">
+          {moodleQuestionCategoriesDebug.possibleCause}
+        </div>
+      {/if}
     </div>
   {/if}
 

@@ -20,6 +20,27 @@ function validarBaseUrlMoodle(moodleBaseUrl) {
   }
 }
 
+function appendMoodleParam(params, key, value) {
+  if (value === undefined || value === null) {
+    params.append(key, "");
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => appendMoodleParam(params, `${key}[${index}]`, item));
+    return;
+  }
+
+  if (typeof value === "object") {
+    Object.entries(value).forEach(([nestedKey, nestedValue]) => {
+      appendMoodleParam(params, `${key}[${nestedKey}]`, nestedValue);
+    });
+    return;
+  }
+
+  params.append(key, String(value));
+}
+
 /**
  * Chama uma função (wsfunction) via Moodle Web Services REST.
  * - Envia POST para /webservice/rest/server.php
@@ -47,9 +68,9 @@ export async function TestarFuncaoMoodleAsync(
     wstoken: token.trim(),
     wsfunction: functionName.trim(),
     moodlewsrestformat: "json",
-    ...Object.fromEntries(
-      Object.entries(extraParams).map(([k, v]) => [k, v == null ? "" : String(v)])
-    ),
+  });
+  Object.entries(extraParams).forEach(([key, value]) => {
+    appendMoodleParam(body, key, value);
   });
 
   let response;

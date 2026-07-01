@@ -175,7 +175,7 @@ let deleteFolderMode = "move"; // move | delete
     moveTagsError = "";
     const ids = Array.from(moveTagsSelected);
     if (ids.length === 0) {
-      moveTagsError = "Seleciona pelo menos uma etiqueta";
+      moveTagsError = "Seleciona pelo menos um chapter";
       return;
     }
 
@@ -186,7 +186,7 @@ let deleteFolderMode = "move"; // move | delete
       closeMoveTagsModal();
       await loadData();
     } catch (e) {
-      moveTagsError = e?.response?.data?.error || "Erro ao mover etiquetas";
+      moveTagsError = e?.response?.data?.error || "Erro ao mover chapters";
     } finally {
       moveTagsLoading = false;
     }
@@ -210,7 +210,7 @@ let deleteFolderMode = "move"; // move | delete
         openFolderIds = openFolderIds.filter((k) => availableKeys.has(k));
       }
     } catch (e) {
-      error = e?.response?.data?.error || "Erro ao carregar etiquetas e pastas";
+      error = e?.response?.data?.error || "Erro ao carregar chapters e pastas";
     } finally {
       loading = false;
     }
@@ -259,7 +259,7 @@ let deleteFolderMode = "move"; // move | delete
       cancelTagForm();
       await loadData();
     } catch (e) {
-      tagFormError = e?.response?.data?.error || "Erro ao guardar etiqueta";
+      tagFormError = e?.response?.data?.error || "Erro ao guardar chapter";
     } finally {
       tagFormLoading = false;
     }
@@ -270,7 +270,7 @@ let deleteFolderMode = "move"; // move | delete
       await api.put(`/chapter-tags/${tag._id}`, { isActive: !tag.isActive });
       await loadData();
     } catch (e) {
-      error = e?.response?.data?.error || "Erro ao atualizar etiqueta";
+      error = e?.response?.data?.error || "Erro ao atualizar chapter";
     }
   }
 
@@ -293,7 +293,7 @@ let deleteFolderMode = "move"; // move | delete
       deletingTag = null;
       await loadData();
     } catch (e) {
-      error = e?.response?.data?.error || "Erro ao eliminar etiqueta";
+      error = e?.response?.data?.error || "Erro ao eliminar chapter";
       deletingTag = null;
     }
   }
@@ -396,8 +396,8 @@ async function deleteFolder() {
     <div style="display: flex; flex-direction: column; gap: 16px;">
       <div style="display: flex; gap: 24px; justify-content: space-between; align-items: flex-start;">
         <div>
-          <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #1e293b;">Capítulos e Temas</h1>
-          <p style="margin: 8px 0 0; font-size: 14px; color: #64748b;">Organizar questões em estrutura hierárquica</p>
+          <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #1e293b;">Chapters</h1>
+          <p style="margin: 8px 0 0; font-size: 14px; color: #64748b;">Organizar questões por chapters e pastas</p>
         </div>
         <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
           <button
@@ -416,7 +416,7 @@ async function deleteFolder() {
             style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.15s;"
             on:click={() => startCreateTag("")}
           >
-            ➕ Nova Tag
+            + Novo Chapter
           </button>
         </div>
       </div>
@@ -425,7 +425,7 @@ async function deleteFolder() {
       <div style="position: relative;">
         <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 18px;">🔍</span>
         <input
-          placeholder="Pesquisar capítulos e tags..."
+          placeholder="Pesquisar chapters..."
           value={searchTerm}
           on:input={(e) => (searchTerm = e.target.value)}
           style="width: 100%; padding: 10px 12px 10px 40px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; background: white;"
@@ -443,7 +443,7 @@ async function deleteFolder() {
   {#if tagFormMode !== "none"}
     <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; display: grid; gap: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
       <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">{tagFormMode === "edit" ? "Editar etiqueta" : "Nova etiqueta"}</h3>
+        <h3 style="margin: 0; font-size: 16px; font-weight: 600; color: #1e293b;">{tagFormMode === "edit" ? "Editar chapter" : "Novo chapter"}</h3>
         <button style="padding: 8px 12px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 14px;" on:click={cancelTagForm} disabled={tagFormLoading}>Fechar</button>
       </div>
 
@@ -542,14 +542,14 @@ async function deleteFolder() {
     {#if loading}
       <div style="color: #64748b; text-align: center; padding: 20px;">A carregar...</div>
     {:else if filteredGroups.length === 0}
-      <div style="color: #64748b; text-align: center; padding: 20px;">Nenhuma etiqueta encontrada.</div>
+      <div style="color: #64748b; text-align: center; padding: 20px;">Nenhum chapter encontrado.</div>
     {:else}
       <div style="display: flex; flex-direction: column; gap: 12px;">
-        <!-- Loose Tags Section -->
+        <!-- Loose Chapters Section -->
         {#each filteredGroups.filter((g) => !g.folder) as group}
           {#if group.tags.length > 0}
             <div style="display: flex; flex-direction: column; gap: 8px;">
-              <div style="font-size: 13px; color: #64748b; padding-bottom: 8px;">Sem Pasta (Tags soltas)</div>
+              <div style="font-size: 13px; color: #64748b; padding-bottom: 8px;">Sem pasta (chapters soltos)</div>
               <div style="display: flex; flex-direction: column; gap: 0; margin-left: 0;">
                 {#each group.tags as tag}
                   <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px; border-bottom: 1px solid #f3f4f6; transition: all 0.15s;">
@@ -571,7 +571,7 @@ async function deleteFolder() {
                 style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #2563eb; background: transparent; border: none; cursor: pointer; padding: 0; margin-left: 8px; margin-top: 4px;"
                 on:click={() => startCreateTag("")}
               >
-                ➕ Adicionar tag
+                + Adicionar chapter
               </button>
             </div>
           {/if}
@@ -613,7 +613,7 @@ async function deleteFolder() {
 
     <div class="modal-content" role="dialog" aria-modal="true" tabindex="-1">
       <div style="display:flex; justify-content: space-between; align-items:center; gap: 12px;">
-        <h3 style="margin: 0;">Mover etiquetas existentes</h3>
+        <h3 style="margin: 0;">Mover chapters existentes</h3>
         <button class="btn" on:click={closeMoveTagsModal} disabled={moveTagsLoading}>Fechar</button>
       </div>
 
@@ -631,7 +631,7 @@ async function deleteFolder() {
       </div>
 
       <input
-        placeholder="Procurar etiqueta..."
+        placeholder="Procurar chapter..."
         value={moveTagsSearch}
         on:input={(e) => (moveTagsSearch = e.target.value)}
         style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;"
@@ -667,7 +667,7 @@ async function deleteFolder() {
 
       <div style="margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; background: white; max-height: 320px; overflow: auto;">
         {#if moveCandidates.length === 0}
-          <div style="padding: 12px; color: var(--muted);">Sem etiquetas disponíveis para mover.</div>
+          <div style="padding: 12px; color: var(--muted);">Sem chapters disponíveis para mover.</div>
         {:else}
           {#each moveCandidates as tag (tag._id)}
             <label style="display:flex; align-items:center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid #f3f4f6; cursor: pointer;">
@@ -706,7 +706,7 @@ async function deleteFolder() {
     ></button>
 
     <div class="modal-content" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="delete-tag-title">
-      <h3 id="delete-tag-title" style="margin: 0 0 12px 0;">Gerir etiqueta</h3>
+      <h3 id="delete-tag-title" style="margin: 0 0 12px 0;">Gerir chapter</h3>
       <p style="margin: 0 0 12px 0; color: var(--muted);">O que fazer com "{deletingTag.name}"?</p>
 
       <div style="display: grid; gap: 8px; margin-bottom: 16px;">
@@ -746,22 +746,22 @@ async function deleteFolder() {
 
     <div class="modal-content" role="dialog" aria-modal="true" tabindex="-1" aria-labelledby="delete-folder-title">
       <h3 id="delete-folder-title" style="margin: 0 0 12px 0;">Apagar pasta</h3>
-      <p style="margin: 0 0 12px 0; color: var(--muted);">Escolhe como tratar as etiquetas desta pasta.</p>
+      <p style="margin: 0 0 12px 0; color: var(--muted);">Escolhe como tratar os chapters desta pasta.</p>
 
       <div style="display: grid; gap: 8px; margin-bottom: 12px;">
         <label class="option-row">
           <input type="radio" name="deleteFolderMode" value="move" bind:group={deleteFolderMode} />
           <div>
             <div style="font-weight: 600;">Mover para "Sem pasta" e apagar pasta</div>
-            <div class="option-help">As etiquetas continuam disponíveis na lista geral.</div>
+            <div class="option-help">Os chapters continuam disponíveis na lista geral.</div>
           </div>
         </label>
 
         <label class="option-row">
           <input type="radio" name="deleteFolderMode" value="delete" bind:group={deleteFolderMode} />
           <div>
-            <div style="font-weight: 600; color: #b91c1c;">Apagar pasta e etiquetas</div>
-            <div class="option-help">Remove a pasta e elimina definitivamente as etiquetas dentro dela.</div>
+            <div style="font-weight: 600; color: #b91c1c;">Apagar pasta e chapters</div>
+            <div class="option-help">Remove a pasta e elimina definitivamente os chapters dentro dela.</div>
           </div>
         </label>
       </div>

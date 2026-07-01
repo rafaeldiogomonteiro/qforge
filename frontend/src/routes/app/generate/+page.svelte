@@ -248,6 +248,10 @@
 
       // Backend retorna { success: true, questions: [...] }
       generated = data?.questions || [];
+      if (bankId && generated.length > 0) {
+        goto(`/app/banks/${bankId}`);
+        return;
+      }
       
       console.log('Questões geradas:', generated);
   } catch (e) {
@@ -317,7 +321,7 @@
     </p>
   </div>
 
-  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+  <div style="display: grid; grid-template-columns: 1fr; gap: 24px;">
     <!-- Left Column: Form -->
     <div style={generated.length > 0 ? "display: none;" : "display: flex; flex-direction: column;"}>
       <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 18px;">
@@ -492,7 +496,7 @@
     </div>
 
     <!-- Right Column: Results -->
-    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: flex; flex-direction: column;">
+    <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); display: {generated.length === 0 ? 'none' : 'flex'}; flex-direction: column;">
       <h3 style="margin: 0 0 18px 0; font-size: 16px; font-weight: 600; color: #1e293b;">📋 Resultados</h3>
 
       {#if generated.length === 0}

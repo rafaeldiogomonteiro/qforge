@@ -8,13 +8,17 @@
     "start": "node src/index.js"
   },
   "dependencies": {
+    "@langchain/openai": "^1.5.3",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
     "fast-xml-parser": "^5.3.4",
     "jsonwebtoken": "^9.0.2",
+    "langchain": "^1.5.2",
     "mongoose": "^8.8.0",
+    "multer": "^2.2.0",
+    "pdf-parse": "^2.4.5",
     "swagger-ui-express": "^5.0.1",
     "undici": "^6.19.7"
   },

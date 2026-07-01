@@ -89,10 +89,58 @@ export async function listMyBanks(req, res) {
     const banks = await QuestionBank.find(filter)
       .sort({ createdAt: -1 })
       .skip((pageNum - 1) * limitNum)
-      .limit(limitNum);
+      .limit(limitNum)
+      .lean();
+
+    const bankIds = banks.map((bank) => bank._id);
+    const questionStats = bankIds.length
+      ? await Question.find({ bank: { $in: bankIds } })
+          .select("bank labels chapterTags")
+          .lean()
+      : [];
+
+    const statsByBank = new Map(
+      bankIds.map((bankId) => [
+        String(bankId),
+        {
+          questionCount: 0,
+          labelIds: new Set(),
+          chapterTagIds: new Set(),
+        },
+      ])
+    );
+
+    questionStats.forEach((question) => {
+      const key = String(question.bank);
+      const stats = statsByBank.get(key);
+      if (!stats) return;
+
+      stats.questionCount += 1;
+      (question.labels || []).forEach((labelId) => {
+        if (labelId) stats.labelIds.add(String(labelId));
+      });
+      (question.chapterTags || []).forEach((chapterTagId) => {
+        if (chapterTagId) stats.chapterTagIds.add(String(chapterTagId));
+      });
+    });
+
+    const banksWithStats = banks.map((bank) => {
+      const stats = statsByBank.get(String(bank._id)) || {
+        questionCount: 0,
+        labelIds: new Set(),
+        chapterTagIds: new Set(),
+      };
+
+      return {
+        ...bank,
+        questionCount: stats.questionCount,
+        labelCount: stats.labelIds.size,
+        chapterCount: stats.chapterTagIds.size,
+      };
+    });
 
     res.json({
-      data: banks,
+      data: banksWithStats,
       pagination: {
         page: pageNum,
         limit: limitNum,

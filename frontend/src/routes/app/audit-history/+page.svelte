@@ -5,7 +5,11 @@
   let filterAction = "Todas as ações";
   let auditLogs = [];
   let filteredLogs = [];
+  let stats = [];
+  let resultStats = [];
   let loading = true;
+  let statsLoading = true;
+  let error = "";
   let currentPage = 1;
   let totalPages = 1;
   let pageSize = 10;
@@ -18,11 +22,29 @@
     "Exportação",
     "Importação",
     "Geração IA",
-    "Visualização"
   ];
+
+  loadAuditStats();
+  loadAuditLogs();
+
+  async function loadAuditStats() {
+    statsLoading = true;
+    try {
+      const { data } = await api.get("/audit-logs/stats");
+      stats = data?.actionStats || [];
+      resultStats = data?.successRate || [];
+    } catch (e) {
+      console.error("Erro ao carregar estatísticas de auditoria:", e);
+      stats = [];
+      resultStats = [];
+    } finally {
+      statsLoading = false;
+    }
+  }
 
   async function loadAuditLogs(page = 1) {
     loading = true;
+    error = "";
     try {
       const params = new URLSearchParams();
       params.set("page", page);
@@ -35,42 +57,29 @@
       auditLogs = res.data?.data || [];
       currentPage = res.data?.pagination?.page || 1;
       totalPages = res.data?.pagination?.totalPages || 1;
-      
       filterLogs();
     } catch (e) {
       console.error("Erro ao carregar logs de auditoria:", e);
-      // Fallback com dados fictícios
-      auditLogs = [
-        {
-          _id: "1",
-          createdAt: "2026-03-27T14:32:00Z",
-          userId: { email: "admin@qforge.pt" },
-          action: "Exportação",
-          targetName: "Banco Matemática",
-          result: "Sucesso"
-        },
-        {
-          _id: "2",
-          createdAt: "2026-03-27T13:15:00Z",
-          userId: { email: "prof.silva@qforge.pt" },
-          action: "Geração IA",
-          targetName: "Banco História",
-          result: "Sucesso"
-        }
-      ];
-      filterLogs();
+      error = e?.response?.data?.error || "Erro ao carregar auditoria.";
+      auditLogs = [];
+      filteredLogs = [];
     } finally {
       loading = false;
     }
   }
 
   function filterLogs() {
-    filteredLogs = auditLogs.filter(log => {
-      const matchesSearch = 
-        (log.userId?.email || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (log.targetName || "").toLowerCase().includes(searchQuery.toLowerCase());
-      
-      return matchesSearch;
+    const query = searchQuery.trim().toLowerCase();
+    filteredLogs = auditLogs.filter((log) => {
+      if (!query) return true;
+      return [
+        log.action,
+        log.targetType,
+        log.targetName,
+        log.result,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
     });
   }
 
@@ -88,22 +97,38 @@
   function formatDate(date) {
     if (!date) return "";
     const d = new Date(date);
-    return d.toLocaleDateString("pt-PT") + " " + d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
+    return (
+      d.toLocaleDateString("pt-PT") +
+      " " +
+      d.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })
+    );
+  }
+
+  function countFor(action) {
+    return stats.find((item) => item._id === action)?.count || 0;
+  }
+
+  function totalActions() {
+    return stats.reduce((sum, item) => sum + (item.count || 0), 0);
+  }
+
+  function successfulActions() {
+    return resultStats.find((item) => item._id === "Sucesso")?.count || 0;
   }
 
   function exportCSV() {
-    const headers = ["Data", "Utilizador", "Ação", "Alvo", "Resultado"];
-    const rows = filteredLogs.map(log => [
+    const headers = ["Data", "Ação", "Tipo", "Alvo", "Resultado"];
+    const rows = filteredLogs.map((log) => [
       formatDate(log.createdAt),
-      log.userId?.email || "Desconhecido",
       log.action,
+      log.targetType || "-",
       log.targetName || "-",
-      log.result
+      log.result,
     ]);
 
     const csv = [
       headers.join(","),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
     ].join("\n");
 
     const blob = new Blob([csv], { type: "text/csv" });
@@ -114,70 +139,87 @@
     a.click();
     URL.revokeObjectURL(url);
   }
-
-  // Carregar dados ao montar a página
-  loadAuditLogs();
 </script>
 
 <div style="padding: 0;">
   <h1 style="margin: 0 0 8px 0; font-size: 28px;">Histórico / Auditoria</h1>
-  <p style="color: var(--muted); margin-top: 0;">Registo de todas as ações realizadas no sistema</p>
+  <p style="color: var(--muted); margin-top: 0;">Registo das tuas ações na aplicação</p>
+</div>
+
+<div style="margin-top: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px;">
+  <div class="stat-box">
+    <div class="stat-value">{statsLoading ? "..." : totalActions()}</div>
+    <div class="stat-label">Ações registadas</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-value">{statsLoading ? "..." : successfulActions()}</div>
+    <div class="stat-label">Sucessos</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-value">{statsLoading ? "..." : countFor("Geração IA")}</div>
+    <div class="stat-label">Gerações IA</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-value">{statsLoading ? "..." : countFor("Importação") + countFor("Exportação")}</div>
+    <div class="stat-label">Importações / Exportações</div>
+  </div>
 </div>
 
 <div style="margin-top: 24px; background: white; border: 1px solid var(--border); border-radius: 14px; padding: 20px;">
-  <!-- FILTROS E BUSCA -->
-  <div style="display: grid; grid-template-columns: 1fr 1fr 120px; gap: 12px; margin-bottom: 20px;">
-    <div>
-      <input
-        type="text"
-        placeholder="Pesquisar por alvo ou utilizador..."
-        value={searchQuery}
-        on:input={(e) => handleSearchChange(e.target.value)}
-        style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;"
-      />
-    </div>
+  <div style="display: grid; grid-template-columns: 1fr 220px 120px; gap: 12px; margin-bottom: 20px;">
+    <input
+      type="text"
+      placeholder="Pesquisar por ação ou alvo..."
+      value={searchQuery}
+      on:input={(e) => handleSearchChange(e.target.value)}
+      style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px;"
+    />
 
-    <div>
-      <select
-        value={filterAction}
-        on:change={(e) => handleActionChange(e.target.value)}
-        style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: white; font-size: 14px;"
-      >
-        {#each actions as action}
-          <option value={action}>{action}</option>
-        {/each}
-      </select>
-    </div>
+    <select
+      value={filterAction}
+      on:change={(e) => handleActionChange(e.target.value)}
+      style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: white; font-size: 14px;"
+    >
+      {#each actions as action}
+        <option value={action}>{action}</option>
+      {/each}
+    </select>
 
     <button
       on:click={exportCSV}
-      style="padding: 10px 16px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 14px;"
+      disabled={filteredLogs.length === 0}
+      style="padding: 10px 16px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; font-size: 14px; opacity: {filteredLogs.length === 0 ? 0.6 : 1};"
     >
-      📥 Exportar CSV
+      CSV
     </button>
   </div>
 
-  <!-- TABELA -->
+  {#if error}
+    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 10px; color: #b91c1c; margin-bottom: 12px;">
+      {error}
+    </div>
+  {/if}
+
   <div style="overflow-x: auto;">
     <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
       <thead>
         <tr style="border-bottom: 2px solid var(--border);">
-          <th style="text-align: left; padding: 12px 0; color: var(--muted); font-weight: 500;">Data</th>
-          <th style="text-align: left; padding: 12px 0; color: var(--muted); font-weight: 500;">Utilizador</th>
-          <th style="text-align: left; padding: 12px 0; color: var(--muted); font-weight: 500;">Ação</th>
-          <th style="text-align: left; padding: 12px 0; color: var(--muted); font-weight: 500;">Alvo</th>
-          <th style="text-align: left; padding: 12px 0; color: var(--muted); font-weight: 500;">Resultado</th>
+          <th>Data</th>
+          <th>Ação</th>
+          <th>Tipo</th>
+          <th>Alvo</th>
+          <th>Resultado</th>
         </tr>
       </thead>
       <tbody>
         {#each filteredLogs as log}
-          <tr style="border-bottom: 1px solid var(--border); transition: background 0.15s;">
-            <td style="padding: 12px 0;">{formatDate(log.createdAt)}</td>
-            <td style="padding: 12px 0;">{log.userId?.email || "Desconhecido"}</td>
-            <td style="padding: 12px 0;">{log.action}</td>
-            <td style="padding: 12px 0; color: #2563eb; text-decoration: underline; cursor: pointer;">{log.targetName || "-"}</td>
-            <td style="padding: 12px 0;">
-              <span style="background: {log.result === 'Sucesso' ? '#dcfce7' : '#fee2e2'}; color: {log.result === 'Sucesso' ? '#166534' : '#991b1b'}; padding: 4px 8px; border-radius: 4px; font-size: 13px; font-weight: 500;">
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td>{formatDate(log.createdAt)}</td>
+            <td>{log.action}</td>
+            <td>{log.targetType || "-"}</td>
+            <td>{log.targetName || "-"}</td>
+            <td>
+              <span class={log.result === "Sucesso" ? "status-ok" : "status-error"}>
                 {log.result}
               </span>
             </td>
@@ -194,40 +236,84 @@
 
     {#if loading}
       <div style="text-align: center; padding: 40px; color: var(--muted);">
-        Carregando...
+        A carregar...
       </div>
     {/if}
   </div>
 
-  <!-- PAGINAÇÃO -->
   <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted);">
     <span>Página {currentPage} de {totalPages}</span>
     <div style="display: flex; gap: 8px;">
-      <button
-        on:click={() => currentPage > 1 && loadAuditLogs(currentPage - 1)}
-        disabled={currentPage === 1}
-        style="padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; background: white; cursor: {currentPage === 1 ? 'not-allowed' : 'pointer'}; font-size: 13px; opacity: {currentPage === 1 ? 0.5 : 1};"
-      >
-        ◀ Anterior
+      <button class="pager" on:click={() => currentPage > 1 && loadAuditLogs(currentPage - 1)} disabled={currentPage === 1}>
+        Anterior
       </button>
-      <span style="padding: 6px 10px;">Página {currentPage} de {totalPages}</span>
-      <button
-        on:click={() => currentPage < totalPages && loadAuditLogs(currentPage + 1)}
-        disabled={currentPage === totalPages}
-        style="padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; background: white; cursor: {currentPage === totalPages ? 'not-allowed' : 'pointer'}; font-size: 13px; opacity: {currentPage === totalPages ? 0.5 : 1};"
-      >
-        Próximo ▶
+      <button class="pager" on:click={() => currentPage < totalPages && loadAuditLogs(currentPage + 1)} disabled={currentPage === totalPages}>
+        Próximo
       </button>
     </div>
   </div>
 </div>
 
 <style>
-  table {
-    border-spacing: 0;
+  .stat-box {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
   }
 
-  tr:hover {
-    background: #f9fafb;
+  .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1e293b;
+  }
+
+  .stat-label {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  th,
+  td {
+    text-align: left;
+    padding: 12px 0;
+  }
+
+  th {
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .status-ok,
+  .status-error {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .status-ok {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .status-error {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  .pager {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    font-size: 13px;
+  }
+
+  .pager:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>

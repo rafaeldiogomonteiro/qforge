@@ -350,21 +350,276 @@ export async function listMoodleCoursesHandler(req, res) {
   }
 }
 
-function extractCategoriesFromMoodleResponse(payload) {
-  const candidate =
-    payload?.categories ||
-    payload?.questioncategories ||
-    payload?.question_categories ||
-    payload?.data ||
-    payload;
+function shouldIncludeMoodleDebug(req) {
+  return String(req.query?.debug || "").toLowerCase() === "true";
+}
 
-  if (Array.isArray(candidate)) return candidate;
-  if (candidate && typeof candidate === "object") {
-    const values = Object.values(candidate);
-    if (Array.isArray(values)) return values;
+function isObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function summarizePayloadShape(payload) {
+  if (Array.isArray(payload)) {
+    return {
+      type: "array",
+      length: payload.length,
+      firstItemKeys: isObject(payload[0]) ? Object.keys(payload[0]) : [],
+    };
   }
 
-  return [];
+  if (isObject(payload)) {
+    return {
+      type: "object",
+      keys: Object.keys(payload),
+    };
+  }
+
+  return {
+    type: payload === null ? "null" : typeof payload,
+  };
+}
+
+function getNestedObject(value, key) {
+  const nested = value?.[key];
+  return isObject(nested) ? nested : {};
+}
+
+function normalizeMoodleQuestionCategory(category) {
+  const nestedCategory = getNestedObject(category, "category");
+  const nestedQuestionCategory = getNestedObject(category, "questioncategory");
+
+  const idCandidates = [
+    category?.questioncategoryid,
+    category?.questioncategory_id,
+    category?.questioncategory,
+    nestedQuestionCategory?.id,
+    nestedQuestionCategory?.categoryid,
+    nestedQuestionCategory?.questioncategoryid,
+    category?.categoryid,
+    category?.category_id,
+    nestedCategory?.id,
+    nestedCategory?.categoryid,
+    nestedCategory?.questioncategoryid,
+    category?.id,
+    category?.value,
+    category?.key,
+  ];
+  const id = Number(
+    idCandidates.find((value) => value !== undefined && value !== null) ?? 0
+  );
+
+  const name =
+    category?.name ||
+    category?.fullname ||
+    category?.displayname ||
+    category?.categoryname ||
+    category?.categoryName ||
+    category?.label ||
+    category?.text ||
+    category?.title ||
+    nestedQuestionCategory?.name ||
+    nestedQuestionCategory?.fullname ||
+    nestedQuestionCategory?.categoryname ||
+    nestedCategory?.name ||
+    nestedCategory?.fullname ||
+    nestedCategory?.categoryname ||
+    "";
+
+  const validId = Number.isFinite(id) && id > 0 ? id : null;
+
+  return {
+    id: validId,
+    name: String(name || (validId ? `Categoria ${validId}` : "")).trim(),
+    hadName: Boolean(String(name || "").trim()),
+  };
+}
+
+function extractCategoriesFromMoodleResponse(payload) {
+  const knownContainers = [
+    "categories",
+    "questioncategories",
+    "question_categories",
+    "questionbankcategories",
+    "question_bank_categories",
+    "questionBankCategories",
+    "categorylist",
+    "category_list",
+    "data",
+    "payload",
+    "result",
+    "results",
+    "items",
+    "records",
+    "values",
+    "list",
+  ];
+
+  const seen = new Set();
+  const candidates = [];
+
+  function scoreCategoryCandidate(items, path, fromKnownContainer) {
+    const normalized = items.map((item) => normalizeMoodleQuestionCategory(item));
+    const validIdCount = normalized.filter((item) => item.id).length;
+    const namedCount = normalized.filter((item) => item.id && item.hadName).length;
+    const objectCount = items.filter((item) => isObject(item)).length;
+    const categoryPath = /categor/i.test(path);
+
+    return (
+      validIdCount * 20 +
+      namedCount * 5 +
+      objectCount +
+      (categoryPath ? 30 : 0) +
+      (fromKnownContainer ? 15 : 0) +
+      (items.length > 0 ? 2 : 0)
+    );
+  }
+
+  function addCandidate(items, path, fromKnownContainer) {
+    if (/(\.|^)(warnings?|messages?|errors?)$/i.test(path)) return;
+
+    candidates.push({
+      categoriesRaw: items,
+      sourcePath: path,
+      score: scoreCategoryCandidate(items, path, fromKnownContainer),
+    });
+  }
+
+  function collectFrom(value, path, fromKnownContainer = false) {
+    if (value === null || value === undefined) return;
+    if (seen.has(value)) return;
+    if (typeof value === "object") seen.add(value);
+
+    if (Array.isArray(value)) {
+      addCandidate(value, path, fromKnownContainer);
+      return;
+    }
+
+    if (!isObject(value)) return;
+
+    const numericKeys = Object.keys(value).filter((key) => /^\d+$/.test(key));
+    if (numericKeys.length > 0) {
+      addCandidate(
+        numericKeys
+          .sort((a, b) => Number(a) - Number(b))
+          .map((key) => value[key]),
+        path,
+        fromKnownContainer
+      );
+    }
+
+    for (const key of knownContainers) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        collectFrom(value[key], `${path}.${key}`, true);
+      }
+    }
+
+    for (const [key, nestedValue] of Object.entries(value)) {
+      if (knownContainers.includes(key)) continue;
+      if (!isObject(nestedValue) && !Array.isArray(nestedValue)) continue;
+      collectFrom(nestedValue, `${path}.${key}`, /categor/i.test(key));
+    }
+  }
+
+  collectFrom(payload, "root");
+
+  const viableCandidates = candidates.filter((candidate) => {
+    return (
+      candidate.score > 0 ||
+      /categor/i.test(candidate.sourcePath) ||
+      candidate.categoriesRaw.length > 0
+    );
+  });
+
+  viableCandidates.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return b.categoriesRaw.length - a.categoriesRaw.length;
+  });
+
+  const found = viableCandidates[0];
+  return found
+    ? { categoriesRaw: found.categoriesRaw, sourcePath: found.sourcePath }
+    : { categoriesRaw: [], sourcePath: null };
+}
+
+function extractMoodleDiagnosticMessage(payload) {
+  if (!payload) return null;
+
+  const direct =
+    payload?.message ||
+    payload?.error ||
+    payload?.warning ||
+    payload?.exception ||
+    payload?.debuginfo;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+
+  const warning = Array.isArray(payload?.warnings) ? payload.warnings[0] : null;
+  const warningMessage = warning?.message || warning?.warning || warning?.item;
+  if (typeof warningMessage === "string" && warningMessage.trim()) {
+    return warningMessage.trim();
+  }
+
+  if (!isObject(payload) && !Array.isArray(payload)) return null;
+
+  const values = Array.isArray(payload) ? payload : Object.values(payload);
+  for (const value of values) {
+    if (!isObject(value) && !Array.isArray(value)) continue;
+    const nested = extractMoodleDiagnosticMessage(value);
+    if (nested) return nested;
+  }
+
+  return null;
+}
+
+function buildQuestionCategoriesDebug({
+  courseId,
+  json,
+  categoriesRaw,
+  categories,
+  sourcePath,
+  missingNameCount,
+  includeRaw,
+}) {
+  const debug = {
+    wsfunction: "local_qforge_moodle_app_get_question_categories",
+    requestedCourseId: courseId,
+    responseShape: summarizePayloadShape(json),
+    categoriesSourcePath: sourcePath,
+    rawCategoryCount: categoriesRaw.length,
+    mappedCategoryCount: categories.length,
+    missingNameCount,
+    requestParamsSent: { courseid: courseId },
+    moodleStatus: json?.status ?? json?.success ?? null,
+    moodleMessage: extractMoodleDiagnosticMessage(json),
+  };
+
+  if (categoriesRaw.length === 0) {
+    if (
+      debug.moodleStatus === false ||
+      /capabil|permission|permiss|acesso|access|allowed|autoriz/i.test(
+        debug.moodleMessage || ""
+      )
+    ) {
+      debug.possibleCause =
+        "O plugin Moodle respondeu sem categorias e parece haver bloqueio de permissao/capability no Moodle.";
+    } else if (debug.moodleMessage) {
+      debug.possibleCause =
+        "O plugin Moodle respondeu sem categorias; verifica a mensagem devolvida pelo plugin.";
+    } else {
+      debug.possibleCause =
+        "O Moodle devolveu uma resposta sem categorias visiveis para este curso, ou o plugin nao devolveu o array no formato esperado.";
+    }
+  } else if (categories.length === 0) {
+    debug.possibleCause =
+      "Foram recebidos itens, mas nenhum tinha id valido para mapear para { id, name }. Verifica o formato do plugin.";
+    debug.rawCategorySample = categoriesRaw[0] || null;
+  }
+
+  if (includeRaw) {
+    debug.rawMoodleResponse = json;
+    debug.rawCategorySample = categoriesRaw[0] || null;
+  }
+
+  return debug;
 }
 
 function extractMoodleXmlFromExportResponse(payload) {
@@ -406,12 +661,14 @@ export async function listMoodleQuestionCategoriesHandler(req, res) {
       return res.status(400).json({ error: "Moodle connection não configurada" });
     }
 
-    const courseIdRaw = req.query?.courseId;
+    const courseIdRaw =
+      req.query?.courseId ?? req.query?.courseid ?? req.query?.course_id;
     const courseIdNum = Number(courseIdRaw);
     if (!Number.isFinite(courseIdNum) || courseIdNum <= 0) {
       return res.status(400).json({ error: "courseId inválido" });
     }
 
+    const includeDebug = shouldIncludeMoodleDebug(req);
     const json = await TestarFuncaoMoodleAsync(
       connection.moodleBaseUrl,
       connection.moodleToken,
@@ -419,37 +676,61 @@ export async function listMoodleQuestionCategoriesHandler(req, res) {
       { courseid: courseIdNum }
     );
 
-    const categoriesRaw = extractCategoriesFromMoodleResponse(json);
-    const categories = categoriesRaw
-      .map((c) => {
-        const idCandidates = [
-          c?.questioncategoryid,
-          c?.question_category_id,
-          c?.categoryid,
-          c?.category_id,
-          c?.id,
-        ];
-        const id = Number(idCandidates.find((v) => v !== undefined && v !== null) ?? 0);
+    const { categoriesRaw, sourcePath } = extractCategoriesFromMoodleResponse(json);
+    const normalizedCategories = categoriesRaw.map((category) =>
+      normalizeMoodleQuestionCategory(category)
+    );
+    const categories = normalizedCategories
+      .filter((category) => category.id)
+      .map(({ id, name }) => ({ id, name }));
+    const missingNameCount = normalizedCategories.filter(
+      (category) => category.id && !category.hadName
+    ).length;
 
-        const name =
-          c?.name ||
-          c?.fullname ||
-          c?.categoryname ||
-          c?.categoryName ||
-          c?.title ||
-          "";
+    const response = { categories };
+    if (includeDebug || categories.length === 0) {
+      response.debug = buildQuestionCategoriesDebug({
+        courseId: courseIdNum,
+        json,
+        categoriesRaw,
+        categories,
+        sourcePath,
+        missingNameCount,
+        includeRaw: includeDebug,
+      });
+    }
 
-        return {
-          id: Number.isFinite(id) && id > 0 ? id : null,
-          name: String(name || "").trim(),
-        };
-      })
-      .filter((c) => c.id && c.name);
+    if (categories.length === 0) {
+      console.warn("[MoodleWS] question categories empty", {
+        courseId: courseIdNum,
+        sourcePath,
+        rawCategoryCount: categoriesRaw.length,
+        moodleStatus: response.debug.moodleStatus,
+        moodleMessage: response.debug.moodleMessage,
+      });
+    }
 
-    return res.json({ categories });
+    return res.json(response);
   } catch (err) {
     console.error("Erro em listMoodleQuestionCategoriesHandler:", err);
-    return res.status(500).json({ error: err?.message || "Erro no servidor" });
+    const message = err?.message || "Erro no servidor";
+    const status = /^Erro Moodle|Falha de ligacao ao Moodle|Resposta HTTP/i.test(message)
+      ? 502
+      : 500;
+
+    return res.status(status).json({
+      error: message,
+      debug: shouldIncludeMoodleDebug(req)
+        ? {
+            wsfunction: "local_qforge_moodle_app_get_question_categories",
+            requestedCourseId: Number(
+              req.query?.courseId ?? req.query?.courseid ?? req.query?.course_id
+            ),
+            possibleCause:
+              "Falha ao chamar o Web Service do Moodle. Confirma se a funcao esta publicada no servico, se o token tem permissao e se o plugin esta instalado.",
+          }
+        : undefined,
+    });
   }
 }
 
@@ -494,7 +775,14 @@ export async function importQuestionBankFromCategoryHandler(req, res) {
 
     const moodleXml = extractMoodleXmlFromExportResponse(exportJson);
     if (!moodleXml || !String(moodleXml).trim()) {
-      return res.status(400).json({ error: "O Moodle não devolveu moodle XML válido" });
+      const backendMsg =
+        exportJson?.message ||
+        "O Moodle não devolveu moodle XML válido (sem XML para importar).";
+      return res.status(400).json({
+        error: backendMsg,
+        moodleQuestionCount: exportJson?.questioncount ?? null,
+        moodleExportableCount: exportJson?.exportablecount ?? null,
+      });
     }
 
     const title = extractTitleFromExportResponse(exportJson);

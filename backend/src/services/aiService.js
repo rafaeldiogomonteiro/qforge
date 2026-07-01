@@ -213,7 +213,7 @@ FORMATO DE RESPOSTA (JSON):
       "type": "MULTIPLE_CHOICE|TRUE_FALSE|SHORT_ANSWER|OPEN",
       "stem": "Enunciado da questão",
       "difficulty": 1,
-      "labels": [],
+      "labels": ["exame", "conceito-chave"],
       "chapterTags": ["HTML", "CSS"],
       "options": [
         { "text": "Opção A", "isCorrect": false },
@@ -231,7 +231,7 @@ NOTAS:
 - "options" só é usado em MULTIPLE_CHOICE e TRUE_FALSE
 - "acceptableAnswers" só é usado em SHORT_ANSWER e OPEN
 - "difficulty" deve ser um inteiro: 1=Básico, 2=Normal, 3=Difícil, 4=Muito Difícil
-- "labels" é definido pelo utilizador fora da IA; devolve sempre array (pode ser vazio), sem inventar labels
+- "labels" deve ser array de 1-3 etiquetas curtas e reutilizáveis; se o utilizador fornecer labels obrigatórias, usa essas
 - "chapterTags" deve ser array de strings com tópicos/conceitos relevantes (ex: ["HTML", "CSS", "JavaScript"])
   IMPORTANTE: Os chapterTags devem ser nomes descritivos e específicos do conteúdo/tópico da questão
   Não uses IDs ou códigos, apenas nomes legíveis como "Programação Linear", "Método Simplex", "HTML Básico", etc.
@@ -457,6 +457,7 @@ export async function generateQuestions(provider, params) {
 
     const providedChapterTags = asStringArray(chapterTags);
     const generatedChapterTags = asStringArray(q.chapterTags);
+    const generatedLabels = asStringArray(q.labels);
     // Se o utilizador forneceu chapterTags, usamos exclusivamente esses; caso contrário, ficamos com os gerados (se houver)
     const finalChapterTags =
       providedChapterTags.length > 0 ? providedChapterTags : generatedChapterTags;
@@ -469,7 +470,7 @@ export async function generateQuestions(provider, params) {
         ? q.acceptableAnswers
         : [],
       difficulty,
-      labels: [...providedLabels],
+      labels: providedLabels.length > 0 ? [...providedLabels] : generatedLabels,
       chapterTags: finalChapterTags,
       explanation: q.explanation || "",
       source: "AI",
